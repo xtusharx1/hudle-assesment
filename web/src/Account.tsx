@@ -6,14 +6,11 @@ import {
   ChevronDown,
   ArrowUpRight,
   Ticket,
-  Compass,
   LogOut,
   LogIn,
   UserPlus,
-  Building2,
   Mail,
   Phone,
-  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "./Auth";
 import { useNow } from "./useNow";
@@ -102,94 +99,40 @@ export function ProfileMenu() {
               {initials || <UserRound size={24} />}
             </span>
             <div>
-              <span className="eyebrow green">YOUR HUDLE</span>
-              <h2>{user ? user.name : "Good games start here."}</h2>
-              <p>{user ? user.email : "One account. More time to play."}</p>
+              <h2>{user ? user.name : "Account"}</h2>
+              {user && <p>{user.email}</p>}
             </div>
           </div>
-          <div className="profile-cards">
+          <div className="profile-list">
             {user ? (
               <>
                 <Link className="profile-card" to="/profile">
-                  <span className="profile-card-icon">
-                    <UserRound size={20} />
-                  </span>
-                  <span>
-                    <strong>My profile</strong>
-                    <small>Your details, all together</small>
-                  </span>
-                  <ArrowUpRight size={17} />
+                  <UserRound size={18} />
+                  <span>Profile</span>
                 </Link>
                 <Link className="profile-card" to="/my-bookings">
-                  <span className="profile-card-icon">
-                    <Ticket size={20} />
-                  </span>
-                  <span>
-                    <strong>My bookings</strong>
-                    <small>Your next game awaits</small>
-                  </span>
-                  <ArrowUpRight size={17} />
+                  <Ticket size={18} />
+                  <span>My bookings</span>
                 </Link>
+                <button
+                  className="profile-card profile-card-logout"
+                  onClick={signOut}
+                >
+                  <LogOut size={18} />
+                  <span>Log out</span>
+                </button>
               </>
             ) : (
               <>
                 <Link className="profile-card" to="/login">
-                  <span className="profile-card-icon">
-                    <LogIn size={20} />
-                  </span>
-                  <span>
-                    <strong>Sign in</strong>
-                    <small>Welcome back to the game</small>
-                  </span>
-                  <ArrowUpRight size={17} />
+                  <LogIn size={18} />
+                  <span>Sign in</span>
                 </Link>
                 <Link className="profile-card" to="/register">
-                  <span className="profile-card-icon">
-                    <UserPlus size={20} />
-                  </span>
-                  <span>
-                    <strong>Create account</strong>
-                    <small>Make your first move</small>
-                  </span>
-                  <ArrowUpRight size={17} />
+                  <UserPlus size={18} />
+                  <span>Sign up</span>
                 </Link>
               </>
-            )}
-            <Link className="profile-card" to="/">
-              <span className="profile-card-icon">
-                <Compass size={20} />
-              </span>
-              <span>
-                <strong>Discover venues</strong>
-                <small>Find your place to play</small>
-              </span>
-              <ArrowUpRight size={17} />
-            </Link>
-            {user ? (
-              <button
-                className="profile-card profile-card-logout"
-                onClick={signOut}
-              >
-                <span className="profile-card-icon">
-                  <LogOut size={20} />
-                </span>
-                <span>
-                  <strong>Sign out</strong>
-                  <small>See you for the next game</small>
-                </span>
-                <ArrowUpRight size={17} />
-              </button>
-            ) : (
-              <Link className="profile-card" to="/admin">
-                <span className="profile-card-icon">
-                  <Building2 size={20} />
-                </span>
-                <span>
-                  <strong>Venue partners</strong>
-                  <small>Manage your playing spaces</small>
-                </span>
-                <ArrowUpRight size={17} />
-              </Link>
             )}
           </div>
           {error && (
@@ -197,9 +140,6 @@ export function ProfileMenu() {
               {error}
             </p>
           )}
-          <div className="profile-panel-foot">
-            <ShieldCheck size={13} /> Your account. Your games.
-          </div>
         </section>
       )}
     </div>

@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loading, setLoading] = useState(true);
   const [transition, setTransition] = useState<AuthAction | null>(null);
   const busy = useRef(false);
+  const authVersion = useRef(0);
   const client = useQueryClient();
   const clearCustomerData = () => {
     client.cancelQueries({
@@ -70,49 +71,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   useEffect(() => {
     let active = true;
-    api<User>("/auth/me")
-      .then((u) => {
-        if (active) setUser(u);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
+    // Ignore account checks started before a newer login/logout action.
+    const sync = async () => {
+      if (busy.current) return;
+      const version = authVersion.current;
+      try {
+        const current = await api<User>("/auth/me");
+        if (active && version === authVersion.current) setUser(current);
+      } catch (e) {
+        if (
+          active &&
+          version === authVersion.current &&
+          e instanceof ApiError &&
+          e.status === 401
+        ) {
+          setUser(null);
+          clearCustomerData();
+        }
+      } finally {
+        if (active && version === authVersion.current) setLoading(false);
+      }
     };
-  }, []);
-  useEffect(() => {
-    const expired = () => {
-      setUser(null);
-      clearCustomerData();
-    };
-    window.addEventListener("hudle-session-expired", expired);
-    return () => window.removeEventListener("hudle-session-expired", expired);
-  }, [client]);
-  useEffect(() => {
-    let active = true;
-    const sync = () =>
-      api<User>("/auth/me")
-        .then((u) => {
-          if (active) setUser(u);
-        })
-        .catch((e) => {
-          if (active && e instanceof ApiError && e.status === 401)
-            setUser(null);
-        });
     const changed = (e: StorageEvent) => {
       if (e.key === "hudle-account-change") {
+        authVersion.current++;
         clearCustomerData();
         void sync();
       }
     };
+    void sync();
     window.addEventListener("storage", changed);
     window.addEventListener("focus", sync);
+    window.addEventListener("hudle-session-expired", sync);
     return () => {
       active = false;
       window.removeEventListener("storage", changed);
       window.removeEventListener("focus", sync);
+      window.removeEventListener("hudle-session-expired", sync);
     };
   }, [client]);
   async function run<T>(
@@ -122,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (busy.current)
       throw new Error("Please wait for the current sign-in action.");
     busy.current = true;
+    authVersion.current++;
     setTransition(action);
     try {
       const [result] = await Promise.allSettled([
@@ -133,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       busy.current = false;
       setTransition(null);
+      setLoading(false);
     }
   }
   async function authenticate(
@@ -226,7 +223,13 @@ export function AuthPage({ register = false }: { register?: boolean }) {
       setPending(false);
     }
   }
-  if (user && !loading) return <Navigate to={target} replace />;
+  if (loading)
+    return (
+      <main className="page empty" role="status">
+        Loading your account…
+      </main>
+    );
+  if (user) return <Navigate to={target} replace />;
   return (
     <main className="auth-page">
       <section className="auth-story">

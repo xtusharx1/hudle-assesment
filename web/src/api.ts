@@ -92,7 +92,8 @@ export async function api<T>(
           refreshing = null;
         });
     if (await refreshing) return api<T>(path, options, true);
-    window.dispatchEvent(new Event("hudle-session-expired"));
+    if (path !== "/auth/me")
+      window.dispatchEvent(new Event("hudle-session-expired"));
   }
   if (
     r.status === 401 &&

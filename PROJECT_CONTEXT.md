@@ -45,7 +45,7 @@ Historical guest bookings remain admin-visible and are not automatically assigne
 
 ## Frontend behavior
 
-- The profile icon opens four account cards. `/profile` displays account details and booking totals.
+- The profile icon shows Profile, My bookings and Log out for signed-in users. `/profile` displays account details and booking totals.
 - Discovery filters/sort are stored in URL parameters so Back restores them.
 - Slot selection uses current availability and prices. A 409 refreshes the grid.
 - Booking displays a minimum two-second court animation. Login/register/logout use shorter account transitions. Reduced-motion settings are supported.
