@@ -25,6 +25,8 @@ docker compose up --build -d --wait
 
 Open http://localhost:8080 and http://localhost:8080/admin.
 
+Register a customer at `/register`, or sign in at `/login`. There is no seeded customer account. You must sign in before confirming a booking; refreshing/reopening the browser keeps the session.
+
 Local admin: `admin` / `PlayWithHudle!2026`. MySQL: `hudle` / `hudle_local`, database `hudle`. Defaults can be overridden in `.env`. API startup runs migrations, then inserts demo data when needed. Existing data persists between restarts.
 
 ```bash
@@ -56,8 +58,8 @@ Local URLs:
 
 | Service           | URL                              |
 | ----------------- | -------------------------------- |
-| React / Vite      | http://127.0.0.1:5173            |
-| Admin             | http://127.0.0.1:5173/admin      |
+| React / Vite      | http://localhost:5173            |
+| Admin             | http://localhost:5173/admin      |
 | Direct API health | http://127.0.0.1:3001/api/health |
 | MySQL             | 127.0.0.1:3308                   |
 
@@ -65,20 +67,21 @@ Vite proxies `/api` to 3001, so no frontend environment variable is required loc
 
 ## Environment variables
 
-| Variable           | Local default                | Meaning                                              |
-| ------------------ | ---------------------------- | ---------------------------------------------------- |
-| `DB_HOST`          | `127.0.0.1`                  | Host DB address; Compose API uses `db`               |
-| `DB_PORT`          | `3308`                       | Host mapped port; Compose API uses 3306              |
-| `DB_USER`          | `hudle`                      | MySQL user                                           |
-| `DB_PASSWORD`      | `hudle_local`                | MySQL user password                                  |
-| `DB_NAME`          | `hudle`                      | Application schema                                   |
-| `DB_ROOT_PASSWORD` | `root_local_only` in Compose | Local DB initialization/admin password               |
-| `PORT`             | `3001`                       | API listening port                                   |
-| `WEB_ORIGIN`       | `http://localhost:5173`      | Allowed browser origin for direct API access         |
-| `ADMIN_USERNAME`   | `admin`                      | Single admin login                                   |
-| `ADMIN_PASSWORD`   | `PlayWithHudle!2026`         | Single admin password                                |
-| `JWT_SECRET`       | See `.env.example`           | Signing secret; replace for deployment               |
-| `VITE_API_URL`     | empty                        | Optional frontend API origin; set at Vite build time |
+| Variable           | Local default                                 | Meaning                                                |
+| ------------------ | --------------------------------------------- | ------------------------------------------------------ |
+| `DB_HOST`          | `127.0.0.1`                                   | Host DB address; Compose API uses `db`                 |
+| `DB_PORT`          | `3308`                                        | Host mapped port; Compose API uses 3306                |
+| `DB_USER`          | `hudle`                                       | MySQL user                                             |
+| `DB_PASSWORD`      | `hudle_local`                                 | MySQL user password                                    |
+| `DB_NAME`          | `hudle`                                       | Application schema                                     |
+| `DB_ROOT_PASSWORD` | `root_local_only` in Compose                  | Local DB initialization/admin password                 |
+| `PORT`             | `3001`                                        | API listening port                                     |
+| `WEB_ORIGIN`       | `http://localhost:5173,http://localhost:8080` | Comma-separated allowed origins for CORS and mutations |
+| `COOKIE_SECURE`    | `false` locally                               | Set `true` with HTTPS; production defaults to secure   |
+| `ADMIN_USERNAME`   | `admin`                                       | Single admin login                                     |
+| `ADMIN_PASSWORD`   | `PlayWithHudle!2026`                          | Single admin password                                  |
+| `JWT_SECRET`       | See `.env.example`                            | Signing secret; replace for deployment                 |
+| `VITE_API_URL`     | empty                                         | Optional frontend API origin; set at Vite build time   |
 
 Changing MySQL passwords in `.env` after the volume has been initialized does not automatically change existing database users. Update the existing user intentionally instead of deleting data to solve the mismatch.
 
@@ -148,18 +151,18 @@ docker compose up --build -d --wait
 
 ## Troubleshooting
 
-| Symptom                                                   | Action                                                                                                   |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Docker connection error                                   | Start Docker Desktop or your installed Docker runtime                                                    |
-| Address already in use on 3001                            | Stop the Docker API before starting local development, or stop the local API before Compose              |
-| Wrong app / no API on 5173                                | Use Docker on 8080, or start this repository's `npm run dev`                                             |
-| API cannot authenticate to MySQL                          | Check `.env` against credentials used to initialize the existing volume                                  |
-| Empty “My bookings”                                       | Use the same browser and origin where the booking was made; tokens do not transfer between 5173 and 8080 |
-| Today's slots have all started                            | The untouched date automatically advances to tomorrow in IST                                             |
-| No future slots                                           | Generate more through admin; seeding does not extend schedules on every restart                          |
-| Temporary 502 after independently replacing API container | Restart web with `docker compose restart web` so Nginx resolves the replacement API                      |
-| Fonts unavailable                                         | The browser falls back to sans-serif; booking data and bundled photos still work                         |
+| Symptom                                                   | Action                                                                                      |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Docker connection error                                   | Start Docker Desktop or your installed Docker runtime                                       |
+| Address already in use on 3001                            | Stop the Docker API before starting local development, or stop the local API before Compose |
+| Wrong app / no API on 5173                                | Use Docker on 8080, or start this repository's `npm run dev`                                |
+| API cannot authenticate to MySQL                          | Check `.env` against credentials used to initialize the existing volume                     |
+| Empty “My bookings”                                       | Sign in to the account that created the booking; historical guest rows are admin-only       |
+| Today's slots have all started                            | The untouched date automatically advances to tomorrow in IST                                |
+| No future slots                                           | Generate more through admin; seeding does not extend schedules on every restart             |
+| Temporary 502 after independently replacing API container | Restart web with `docker compose restart web` so Nginx resolves the replacement API         |
+| Fonts unavailable                                         | The browser falls back to sans-serif; booking data and bundled photos still work            |
 
 ## Before external deployment
 
-Use a hosted MySQL instance with backups; supply private environment values, HTTPS, a strong JWT secret and a changed admin password. Configure the frontend API origin and CORS for your domain. Do not publish `.env` or database volumes. No cloud account or hosted deployment is included in this repository.
+Use a hosted MySQL instance with backups; supply private environment values, HTTPS, a strong JWT secret and a changed admin password. Set `COOKIE_SECURE=true` and configure `WEB_ORIGIN` for the exact frontend origin. Host the API under the same site, preferably `/api` through a reverse proxy; SameSite=Strict cookies intentionally do not support unrelated frontend/API domains. Customer access JWTs expire after 15 minutes, with automatic refresh up to the session’s 30-day absolute expiry. Do not publish `.env` or database volumes. No cloud account or hosted deployment is included in this repository.

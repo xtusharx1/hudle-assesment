@@ -7,21 +7,21 @@ import { db } from "../src/database/source";
 import { today } from "../src/time";
 let app: INestApplication;
 let admin: string;
+let player: ReturnType<typeof request.agent>;
 let venue: number;
 let slot: number;
 const date = new Date(Date.parse(today()) + 86400000 * 2)
   .toISOString()
   .slice(0, 10);
 const customer = { name: "Test Player", phone: "9876543210" };
-const book = (id = slot) =>
-  request(app.getHttpServer())
-    .post("/api/bookings")
-    .send({ ...customer, slotId: id });
+const book = (id = slot) => player.post("/api/bookings").send({ slotId: id });
 beforeAll(async () => {
   if (!process.env.DB_NAME?.endsWith("_test"))
     throw new Error("Tests require an isolated DB_NAME ending in _test");
   await db.initialize();
   await db.query("DELETE FROM bookings");
+  await db.query("DELETE FROM auth_sessions");
+  await db.query("DELETE FROM users");
   await db.query("DELETE FROM slots");
   await db.query("DELETE FROM venues");
   const module = await Test.createTestingModule({
@@ -37,6 +37,15 @@ beforeAll(async () => {
       password: process.env.ADMIN_PASSWORD || "PlayWithHudle!2026",
     });
   admin = login.body.token;
+  player = request.agent(app.getHttpServer());
+  await player
+    .post("/api/auth/register")
+    .send({
+      ...customer,
+      email: "player@example.com",
+      password: "PlayerPassword!2026",
+    })
+    .expect(201);
 });
 afterAll(async () => {
   if (app) await app.close();
@@ -58,7 +67,7 @@ it("books once and returns 409 for the next attempt", async () => {
   expect(first.status).toBe(201);
   expect(first.body.amount).toBe(50000);
   expect(first.body.access_hash).toBeUndefined();
-  expect(first.body.accessToken).toHaveLength(43);
+  expect(first.body.accessToken).toBeUndefined();
   expect((await book()).status).toBe(409);
 });
 it("serializes ten simultaneous requests: one booking, nine conflicts", async () => {
@@ -83,9 +92,7 @@ it("database constraint rejects duplicates even without the service lock", async
 });
 it("cancels, preserves history, and allows rebooking", async () => {
   const b = (await book()).body;
-  const r = await request(app.getHttpServer())
-    .post(`/api/bookings/${b.reference}/cancel`)
-    .set("x-booking-token", b.accessToken);
+  const r = await player.post(`/api/bookings/${b.reference}/cancel`);
   expect(r.status).toBe(200);
   expect(r.body.status).toBe("CANCELLED");
   expect((await book()).status).toBe(201);
@@ -95,7 +102,7 @@ it("cancels, preserves history, and allows rebooking", async () => {
   );
   expect(history).toHaveLength(2);
 });
-it("does not expose or cancel bookings without their private token", async () => {
+it("does not expose or cancel bookings without signing in", async () => {
   const b = (await book()).body;
   expect(
     (await request(app.getHttpServer()).get(`/api/bookings/${b.reference}`))
@@ -108,13 +115,7 @@ it("does not expose or cancel bookings without their private token", async () =>
         .set("x-booking-token", "wrong")
     ).status,
   ).toBe(401);
-  expect(
-    (
-      await request(app.getHttpServer())
-        .get(`/api/bookings/${b.reference}`)
-        .set("x-booking-token", b.accessToken)
-    ).status,
-  ).toBe(200);
+  expect((await player.get(`/api/bookings/${b.reference}`)).status).toBe(200);
 });
 it("rejects booking and cancelling past slots", async () => {
   await db.query("UPDATE slots SET date='2020-01-01' WHERE id=?", [slot]);
@@ -123,11 +124,7 @@ it("rejects booking and cancelling past slots", async () => {
   const b = (await book()).body;
   await db.query("UPDATE slots SET date='2020-01-01' WHERE id=?", [slot]);
   expect(
-    (
-      await request(app.getHttpServer())
-        .post(`/api/bookings/${b.reference}/cancel`)
-        .set("x-booking-token", b.accessToken)
-    ).status,
+    (await player.post(`/api/bookings/${b.reference}/cancel`)).status,
   ).toBe(409);
 });
 it("rejects blocked slots and inactive venues", async () => {
@@ -142,11 +139,8 @@ it("protects admin routes and validates input", async () => {
     (await request(app.getHttpServer()).get("/api/admin/venues")).status,
   ).toBe(401);
   expect(
-    (
-      await request(app.getHttpServer())
-        .post("/api/bookings")
-        .send({ ...customer, slotId: slot, phone: "123", amount: 1 })
-    ).status,
+    (await player.post("/api/bookings").send({ slotId: slot, amount: 1 }))
+      .status,
   ).toBe(400);
 });
 it("rejects overlapping windows and bulk generation skips existing rows", async () => {
@@ -173,9 +167,7 @@ it("rejects overlapping windows and bulk generation skips existing rows", async 
 });
 it("refuses slot deletion with cancelled booking history", async () => {
   const b = (await book()).body;
-  await request(app.getHttpServer())
-    .post(`/api/bookings/${b.reference}/cancel`)
-    .set("x-booking-token", b.accessToken);
+  await player.post(`/api/bookings/${b.reference}/cancel`);
   expect(
     (
       await request(app.getHttpServer())
@@ -202,9 +194,7 @@ it("cannot block a booked slot and repricing preserves booked amount", async () 
         .send({ price: 90000 })
     ).status,
   ).toBe(200);
-  const r = await request(app.getHttpServer())
-    .get(`/api/bookings/${b.reference}`)
-    .set("x-booking-token", b.accessToken);
+  const r = await player.get(`/api/bookings/${b.reference}`);
   expect(r.body.amount).toBe(50000);
 });
 it("derives sport and location filters from active venues in the database", async () => {
@@ -254,4 +244,152 @@ it("adds the variety batch once, preserving existing venues and creating varied 
     "SELECT COUNT(*) overlaps FROM slots a JOIN slots b ON a.venue_id=b.venue_id AND a.date=b.date AND a.id<b.id AND a.start_time<b.end_time AND a.end_time>b.start_time",
   );
   expect(Number(overlaps)).toBe(0);
+});
+
+it("requires registration before booking and isolates bookings by account", async () => {
+  await request(app.getHttpServer())
+    .post("/api/bookings")
+    .send({ slotId: slot })
+    .expect(401);
+  const outsider = request.agent(app.getHttpServer());
+  await outsider
+    .post("/api/auth/register")
+    .send({
+      name: "Other Player",
+      email: "other@example.com",
+      phone: "9876543211",
+      password: "OtherPassword!2026",
+    })
+    .expect(201);
+  const b = (await book()).body;
+  await outsider.get(`/api/bookings/${b.reference}`).expect(404);
+  await outsider.post(`/api/bookings/${b.reference}/cancel`).expect(404);
+  expect((await outsider.get("/api/bookings")).body).toEqual([]);
+  const mine = await player.get("/api/bookings").expect(200);
+  expect(mine.body.some((x: any) => x.reference === b.reference)).toBe(true);
+  expect(
+    mine.body.every((x: any) => x.customer_email === "player@example.com"),
+  ).toBe(true);
+});
+it("hashes passwords, normalizes email, and issues only HttpOnly session cookies", async () => {
+  const agent = request.agent(app.getHttpServer());
+  const input = {
+    name: "Session Player",
+    email: "SESSION@example.com",
+    phone: "9876543212",
+    password: "SessionPassword!2026",
+  };
+  const result = await agent.post("/api/auth/register").send(input).expect(201);
+  expect(result.body).toMatchObject({
+    name: input.name,
+    email: "session@example.com",
+  });
+  expect(result.body.password_hash).toBeUndefined();
+  expect(result.body.token).toBeUndefined();
+  const cookies = result.headers["set-cookie"] as unknown as string[];
+  expect(cookies).toHaveLength(2);
+  for (const cookie of cookies) {
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("SameSite=Strict");
+  }
+  const [u] = await db.query("SELECT password_hash FROM users WHERE email=?", [
+    "session@example.com",
+  ]);
+  expect(u.password_hash).toMatch(/^scrypt\$/);
+  expect(u.password_hash).not.toContain(input.password);
+  await agent
+    .post("/api/auth/register")
+    .send({ ...input, email: "session@example.com" })
+    .expect(409);
+  await agent
+    .post("/api/auth/login")
+    .send({ email: input.email, password: "wrong-password" })
+    .expect(401);
+  await agent
+    .post("/api/auth/login")
+    .send({ email: input.email, password: input.password })
+    .expect(200);
+  await agent.get("/api/auth/me").expect(200);
+  await agent.get("/api/admin/venues").expect(401);
+});
+it("rotates refresh tokens, restores a session, and revokes access on logout", async () => {
+  const agent = request.agent(app.getHttpServer());
+  const login = await agent
+    .post("/api/auth/login")
+    .send({ email: "session@example.com", password: "SessionPassword!2026" })
+    .expect(200);
+  const cookies = login.headers["set-cookie"] as unknown as string[];
+  const access = cookies
+    .find((c) => c.startsWith("hudle_access="))!
+    .split(";")[0];
+  const refresh = cookies
+    .find((c) => c.startsWith("hudle_refresh="))!
+    .split(";")[0];
+  const restored = await request(app.getHttpServer())
+    .post("/api/auth/refresh")
+    .set("Cookie", refresh)
+    .expect(200);
+  expect(restored.body.email).toBe("session@example.com");
+  await request(app.getHttpServer())
+    .post("/api/auth/refresh")
+    .set("Cookie", refresh)
+    .expect(401);
+  const rotated = (restored.headers["set-cookie"] as unknown as string[])
+    .find((c) => c.startsWith("hudle_refresh="))!
+    .split(";")[0];
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", access)
+    .expect(200);
+  await request(app.getHttpServer())
+    .post("/api/auth/logout")
+    .set("Cookie", rotated)
+    .expect(200);
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", access)
+    .expect(401);
+  await request(app.getHttpServer())
+    .post("/api/auth/refresh")
+    .set("Cookie", rotated)
+    .expect(401);
+});
+it("rejects forged JWTs, expired access tokens, foreign origins, and weak passwords", async () => {
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", "hudle_access=forged")
+    .expect(401);
+  const { JwtService } = await import("@nestjs/jwt");
+  const expired = app
+    .get(JwtService)
+    .sign(
+      { role: "customer", sub: "1", sid: "anything" },
+      { expiresIn: -1, issuer: "hudle-api", audience: "hudle-customer" },
+    );
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", "hudle_access=" + expired)
+    .expect(401);
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", "hudle_access=" + admin)
+    .expect(401);
+  await player
+    .post("/api/bookings")
+    .set("Origin", "https://untrusted.example")
+    .send({ slotId: slot })
+    .expect(403);
+  await request(app.getHttpServer())
+    .post("/api/auth/register")
+    .send({
+      name: "Weak Player",
+      email: "weak@example.com",
+      phone: "9876543210",
+      password: "short",
+    })
+    .expect(400);
+  await player
+    .post("/api/bookings")
+    .send({ slotId: slot, name: "Spoofed Owner" })
+    .expect(400);
 });

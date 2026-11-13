@@ -20,9 +20,9 @@ npm run db:seed
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. The Vite proxy forwards `/api` to NestJS on port 3001. Database port 3308 avoids collisions with an existing local MySQL installation. If Docker is stopped on macOS with Colima installed, run `colima start` first.
+Open **http://localhost:5173**. The Vite proxy forwards `/api` to NestJS on port 3001. Database port 3308 avoids collisions with an existing local MySQL installation. If Docker is stopped on macOS with Colima installed, run `colima start` first.
 
-Admin: **http://127.0.0.1:5173/admin**
+Admin: **http://localhost:5173/admin**
 
 Local demo credentials: `admin` / `PlayWithHudle!2026` (override in `.env`). These are development defaults, not production credentials.
 
@@ -58,7 +58,7 @@ Coverage includes:
 - Ten concurrent attempts: one success, nine conflicts, one confirmed database record.
 - Direct duplicate insert rejected by the database constraint.
 - Cancellation releases availability, rebooking succeeds, history remains.
-- Private access token required to retrieve and cancel bookings.
+- Registration/login, hashed passwords, account ownership, refresh rotation, logout revocation, and forged/expired JWT rejection.
 - Past slots, blocked slots, inactive venues, input validation, and admin authorization.
 - Overlap rejection and duplicate-safe bulk slot generation.
 - Historical slot deletion refusal and immutable booking price after repricing.
@@ -75,7 +75,8 @@ server/src/
   app.ts                 Nest module and request configuration
   controllers.ts         Public and protected admin HTTP endpoints
   catalog.ts             Venue discovery, slot management, bulk generation
-  bookings.ts            Booking transaction, private access, cancellation
+  bookings.ts            Account-owned booking transaction and cancellation
+  auth.ts                Customer registration, JWT cookies, rotating sessions
   common.ts              JWT guard, error filter, hashing helpers
   dtos.ts                Input contracts and validation
   time.ts                Explicit IST conversion and date validation
@@ -86,7 +87,8 @@ server/test/             Real-database HTTP integration tests
 web/src/
   App.tsx                Customer routes and booking screens
   Admin.tsx              Admin sign-in, venues, slots, booking dashboard
-  api.ts                 Typed fetch clients, display helpers, private browser storage
+  Auth.tsx               Registration, login, session context and protected routes
+  api.ts                 Typed fetch clients and single-flight session refresh
   styles.css             Responsive design system
 ```
 
@@ -110,9 +112,11 @@ Slots with booking history cannot be deleted. Blocking an actively booked slot i
 
 ## Identity and security
 
-Signup and OTP are outside the assignment scope. Booking creation issues a random 256-bit capability token. Only its SHA-256 hash is stored in MySQL. The browser retains the token in local storage and supplies it in the `x-booking-token` header to read or cancel that booking. Display references and phone numbers do not grant access. The access hash is excluded from API responses.
+Customers register with name, email, Indian mobile number and a password of at least 10 characters. Email is normalized and unique. Passwords use salted scrypt (N=32768, r=8, p=1), never plaintext. Booking requires login; the server copies contact details from the authenticated profile and stores `user_id` ownership. Only the owner can list, retrieve or cancel a booking. Another account receives 404.
 
-“My bookings” lists the references stored in the current browser. It deliberately has no phone-number search endpoint. Clearing browser storage loses access; cross-device recovery needs verified identity/OTP. Treat the browser/device as trusted; local storage tokens are accessible to scripts on the same origin, so preventing XSS remains important.
+Customer access JWTs last 15 minutes and use issuer/audience/role checks. Random refresh tokens rotate on each refresh; only SHA-256 hashes are stored in MySQL sessions. Sessions expire 30 days after login. Both cookies are HttpOnly and SameSite=Strict; HTTPS deployment uses Secure. JavaScript never stores customer tokens. The frontend refreshes an expired access token once and retries the request. Logout deletes the current session, immediately invalidating its access and refresh tokens. Other devices have independent sessions. Non-GET browser requests check the Origin allowlist, and authentication endpoints are rate limited.
+
+“My bookings” is loaded from MySQL for the account and works on another browser after sign-in. The migration preserves historical guest rows without attaching them to accounts by unverified email/phone; those rows remain admin-visible. Existing local-storage guest tokens no longer grant public access. Email/mobile verification and password recovery are future work.
 
 Admin JWTs expire after eight hours and are kept in session storage. Credentials come from the environment, with constant-time comparisons. Helmet, input allowlisting/validation, and a bounded process-local rate limiter are included. The limiter is suitable for this single-instance demo, not a distributed deployment. Production startup requires explicit `JWT_SECRET` and `ADMIN_PASSWORD`.
 
@@ -131,9 +135,20 @@ Public:
 - `GET /api/venues?sport=&location=&q=`
 - `GET /api/venues/:id`
 - `GET /api/venues/:id/slots?date=YYYY-MM-DD`
-- `POST /api/bookings` — `{ slotId, name, phone, email? }`
-- `GET /api/bookings/:reference` — private booking token header
-- `POST /api/bookings/:reference/cancel` — private booking token header
+
+Customer authentication:
+
+- `POST /api/auth/register` — `{ name, email, phone, password }`
+- `POST /api/auth/login` — `{ email, password }`
+- `POST /api/auth/refresh` and `POST /api/auth/logout`
+- `GET /api/auth/me` — signed-in profile
+
+Customer endpoints (JWT cookie required):
+
+- `POST /api/bookings` — `{ slotId }`
+- `GET /api/bookings` — account history
+- `GET /api/bookings/:reference` — owned booking
+- `POST /api/bookings/:reference/cancel` — owned booking
 
 Admin:
 
@@ -145,12 +160,12 @@ Admin:
 - `PATCH / DELETE /api/admin/slots/:id`
 - `GET /api/admin/bookings?venueId=&date=&status=`
 
-Protected endpoints require `Authorization: Bearer <JWT>`. Errors use `{ error: { code, message } }`. Amounts in API requests/responses are paise; times are IST. Admin booking lists are capped at 500 records for this demo; production needs pagination.
+Admin endpoints require `Authorization: Bearer <JWT>`; customer endpoints use HttpOnly cookies. Errors use `{ error: { code, message } }`. Amounts in API requests/responses are paise; times are IST. Admin booking lists are capped at 500 records for this demo; production needs pagination.
 
 ## Demo walkthrough
 
 1. Filter by a sport and open a venue.
-2. Pick tomorrow's date, choose a slot, and book using sample details.
+2. Pick tomorrow's date, choose a slot, register or sign in, and confirm the booking.
 3. View the confirmation and refresh it to verify secure retrieval.
 4. Visit “My bookings,” cancel the game, and check availability again.
 5. Sign in to admin, edit a venue, generate slots, change a slot price, and view bookings.
@@ -158,9 +173,9 @@ Protected endpoints require `Authorization: Bearer <JWT>`. Errors use `{ error: 
 
 ## Tradeoffs and future work
 
-One venue represents one bookable resource; separate courts require a resource entity and resource-level overlap rules. No payments, holds, notifications, user accounts, OTP recovery, multi-slot booking, image uploads, or recurring opening-hours engine. Venue deactivation is intentionally one-way in this demo admin UI. The customer booking form stacks below slot selection on mobile rather than using a bottom sheet.
+One venue represents one bookable resource; separate courts require a resource entity and resource-level overlap rules. No payments, holds, notifications, email/mobile verification, password recovery, multi-slot booking, image uploads, or recurring opening-hours engine. Venue deactivation is intentionally one-way in this demo admin UI. The customer booking form stacks below slot selection on mobile rather than using a bottom sheet.
 
-Before production: verified customer identity and recovery, hardened admin authentication, secret rotation, HTTPS, backup/restore, pagination, shared rate limiting, observability, idempotency keys for safe POST retries, and bounded deadlock retry handling. Cache venue discovery only after measuring need; availability must always be validated against MySQL in the booking transaction. Add Redis or search infrastructure when traffic/search requirements justify them.
+Before production: email/mobile verification and password recovery, hardened admin authentication, secret rotation, HTTPS, backup/restore, pagination, shared rate limiting, observability, idempotency keys for safe POST retries, and bounded deadlock retry handling. Cache venue discovery only after measuring need; availability must always be validated against MySQL in the booking transaction. Add Redis or search infrastructure when traffic/search requirements justify them.
 
 Dependency audit at implementation time reported no high/critical runtime advisories and five moderate runtime findings through the TypeORM and React Router dependency trees. Review those advisories and their major-version upgrade paths before a production deployment; no forced major upgrades were applied during the assessment build.
 

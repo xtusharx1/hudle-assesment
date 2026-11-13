@@ -32,7 +32,7 @@ Venue details defaults to today in IST. Once all scheduled start times for today
 1. At most one confirmed booking per slot. A transaction locks the venue for sharing and slot for update. A generated-column unique index independently enforces the invariant.
 2. Booking amount comes from the locked slot, never from a client-supplied price. Persist it as a historical snapshot.
 3. Cancelled booking rows remain in the database. Cancellation releases uniqueness, enabling rebooking.
-4. A private booking token is required for reading/cancelling bookings. A phone number or display reference is insufficient.
+4. Customer JWT authentication and user ownership are required for creating, listing, reading and cancelling bookings. Never authorize by phone/email/reference alone.
 5. Admin routes require an admin JWT, except login.
 6. Slot creation and bulk generation serialize through the venue lock and reject/skip overlapping windows. Adjacent windows are valid.
 7. Historical slots cannot be deleted. A confirmed booking prevents blocking its slot. Date/time edits are not exposed.
@@ -44,7 +44,9 @@ Venue details defaults to today in IST. Once all scheduled start times for today
 
 `venues` -> `slots` -> `bookings`; `seed_batches` records the one-time expansion seed. Foreign keys restrict destructive deletes.
 
-Customer bookings live in MySQL. The creation response includes a random 256-bit access token once; only its hash is stored in MySQL. The browser stores reference/token pairs in local storage and supplies `x-booking-token` for retrieval and cancellation. “My bookings” is therefore browser-local discovery of database-backed records. Clearing storage loses customer access; no OTP recovery exists.
+Customer accounts and bookings live in MySQL. Registration uses unique normalized email, name, phone and a scrypt-hashed password. `auth_sessions` stores rotating refresh hashes with an absolute 30-day expiry. Access JWTs last 15 minutes, have customer issuer/audience/role/session claims, and require a live session. HttpOnly SameSite=Strict cookies keep customer tokens out of JavaScript; production cookies require HTTPS. Frontend automatic refresh is single-flight. Logout deletes the current session. Customer and admin authentication stay separate.
+
+`bookings.user_id` owns new bookings; contact details come from the authenticated profile. Account history is available across browsers after login. Historical guest bookings have null ownership and stay admin-visible; never auto-claim them by unverified contact details. The legacy nullable access_hash is retained but unused for public access. Auth pages preserve venue/date/slot selection through a validated local return URL.
 
 Admin credentials are environment variables. Eight-hour admin JWTs are stored in session storage. There is one admin account; no admin user table or role-management screen.
 
@@ -52,22 +54,23 @@ Favourites are local storage. Web fonts require internet. Sport/venue photograph
 
 ## Source map
 
-| Area                                    | Files                                                      |
-| --------------------------------------- | ---------------------------------------------------------- |
-| Bootstrap, validation, rate limiter     | `server/src/main.ts`, `server/src/app.ts`                  |
-| HTTP routes                             | `server/src/controllers.ts`                                |
-| Venue, filter, slot rules               | `server/src/catalog.ts`                                    |
-| Booking transactions and private access | `server/src/bookings.ts`                                   |
-| JWT guard and errors                    | `server/src/common.ts`                                     |
-| DTOs and IST helpers                    | `server/src/dtos.ts`, `server/src/time.ts`                 |
-| Database, migrations, seeds             | `server/src/database/`                                     |
-| API tests                               | `server/test/booking.e2e.spec.ts`                          |
-| Customer routes                         | `web/src/App.tsx`                                          |
-| Admin interface                         | `web/src/Admin.tsx`                                        |
-| API types and browser storage           | `web/src/api.ts`                                           |
-| Automatic date selection                | `web/src/booking-date.ts`, `web/test/booking-date.test.ts` |
-| Shared loading/error UI                 | `web/src/Status.tsx`                                       |
-| Styling                                 | `web/src/styles.css`                                       |
+| Area                                | Files                                                      |
+| ----------------------------------- | ---------------------------------------------------------- |
+| Bootstrap, validation, rate limiter | `server/src/main.ts`, `server/src/app.ts`                  |
+| HTTP routes                         | `server/src/controllers.ts`                                |
+| Venue, filter, slot rules           | `server/src/catalog.ts`                                    |
+| Booking transactions and ownership  | `server/src/bookings.ts`                                   |
+| JWT guard and errors                | `server/src/common.ts`                                     |
+| DTOs and IST helpers                | `server/src/dtos.ts`, `server/src/time.ts`                 |
+| Database, migrations, seeds         | `server/src/database/`                                     |
+| API tests                           | `server/test/booking.e2e.spec.ts`                          |
+| Customer authentication             | `server/src/auth.ts`, `web/src/Auth.tsx`                   |
+| Customer routes                     | `web/src/App.tsx`                                          |
+| Admin interface                     | `web/src/Admin.tsx`                                        |
+| API types and session refresh       | `web/src/api.ts`                                           |
+| Automatic date selection            | `web/src/booking-date.ts`, `web/test/booking-date.test.ts` |
+| Shared loading/error UI             | `web/src/Status.tsx`                                       |
+| Styling                             | `web/src/styles.css`                                       |
 
 ## Running and validation
 
@@ -83,13 +86,13 @@ After frontend changes, build and check relevant desktop/mobile screens. For boo
 - Admin booking list is capped at 500 without pagination.
 - Process-local rate limiting; use a shared store for multiple API instances.
 - No POST idempotency key, distributed deadlock retry policy or observability/backup automation.
-- Local storage capability tokens require a trusted browser and XSS prevention.
+- Email/mobile verification, password recovery, profile editing and expired-session pruning are not implemented.
 - Demo passwords must be changed before an external deployment.
 - Existing README records moderate dependency advisories; assess upgrades before production.
 - The CSS includes base rules and a later brand adaptation block; consolidate when redesigning further.
 
-Prefer completing assessment flows over adding infrastructure. Redis, Elasticsearch and AWS are potential future decisions, not current dependencies. Never publish real customer records, local `.env` values, database volumes, private access tokens or browser session data.
+Prefer completing assessment flows over adding infrastructure. Redis, Elasticsearch and AWS are potential future decisions, not current dependencies. Never publish real customer records, local `.env` values, database volumes, passwords, tokens or browser session data.
 
 ## Booking transition
 
-`web/src/BookingPending.tsx` renders an accessible overlay with a court/ball animation while submitting a booking. The API request starts immediately and runs alongside a minimum two-second display timer. Both success and failure wait for that timer; requests taking longer remain pending. The private booking token is saved as soon as the response succeeds. A synchronous ref prevents duplicate submissions, the overlay captures focus and blocks background interaction, and CSS respects reduced-motion preferences. Confirmation is shown only after API success; conflicts return to the form with the API error.
+`web/src/BookingPending.tsx` renders an accessible overlay with a court/ball animation while submitting a booking. The API request starts immediately and runs alongside a minimum two-second display timer. Both success and failure wait for that timer; requests taking longer remain pending. A synchronous ref prevents duplicate submissions, the overlay captures focus and blocks background interaction, and CSS respects reduced-motion preferences. Confirmation is shown only after API success; conflicts return to the form with the API error.

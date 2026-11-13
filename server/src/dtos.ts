@@ -10,12 +10,35 @@ import {
   IsBoolean,
   IsIn,
 } from "class-validator";
+import { Transform } from "class-transformer";
 export class BookingDto {
   @IsInt() @Min(1) slotId!: number;
-  @IsString() @Length(2, 100) name!: string;
-  @Matches(/^[6-9]\d{9}$/) phone!: string;
-  @IsOptional() @IsEmail() @Length(3, 254) email?: string;
 }
+export class RegisterDto {
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @Matches(/\S/)
+  @Length(2, 100)
+  name!: string;
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.trim().toLowerCase() : value,
+  )
+  @IsEmail()
+  @Length(3, 254)
+  email!: string;
+  @Matches(/^[6-9]\d{9}$/) phone!: string;
+  @IsString() @Length(10, 128) password!: string;
+}
+export class UserLoginDto {
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.trim().toLowerCase() : value,
+  )
+  @IsEmail()
+  @Length(3, 254)
+  email!: string;
+  @IsString() @Length(1, 128) password!: string;
+}
+
 export class LoginDto {
   @IsString() @Length(1, 100) username!: string;
   @IsString() @Length(1, 200) password!: string;

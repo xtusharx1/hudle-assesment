@@ -2,19 +2,16 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  UnauthorizedException,
-  BadRequestException,
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
 import { db } from "./database/source";
-import { hash, equal } from "./common";
+import { User } from "./auth";
 import { startsAt } from "./time";
 import { BookingDto } from "./dtos";
-const select = `SELECT b.reference,b.customer_name,b.customer_phone,b.customer_email,b.status,b.amount,b.created_at,b.cancelled_at,b.access_hash,s.id slot_id,s.date,s.start_time,s.end_time,v.id venue_id,v.name venue_name,v.sport,v.location,v.address,v.image_url FROM bookings b JOIN slots s ON s.id=b.slot_id JOIN venues v ON v.id=s.venue_id`;
+const select = `SELECT b.reference,b.customer_name,b.customer_phone,b.customer_email,b.status,b.amount,b.created_at,b.cancelled_at,s.id slot_id,s.date,s.start_time,s.end_time,v.id venue_id,v.name venue_name,v.sport,v.location,v.address,v.image_url FROM bookings b JOIN slots s ON s.id=b.slot_id JOIN venues v ON v.id=s.venue_id`;
 @Injectable()
 export class BookingsService {
-  async create(b: BookingDto) {
-    const token = randomBytes(32).toString("base64url");
+  async create(b: BookingDto, user: User) {
     const reference = "HD-" + randomBytes(6).toString("hex").toUpperCase();
     try {
       await db.transaction(async (m) => {
@@ -44,14 +41,14 @@ export class BookingsService {
             "Someone has already booked this slot. Please choose another.",
           );
         await m.query(
-          "INSERT INTO bookings(reference,access_hash,slot_id,customer_name,customer_phone,customer_email,amount) VALUES(?,?,?,?,?,?,?)",
+          "INSERT INTO bookings(reference,user_id,slot_id,customer_name,customer_phone,customer_email,amount) VALUES(?,?,?,?,?,?,?)",
           [
             reference,
-            hash(token),
+            user.id,
             s.id,
-            b.name.trim(),
-            b.phone,
-            b.email || null,
+            user.name,
+            user.phone,
+            user.email,
             s.price,
           ],
         );
@@ -64,17 +61,23 @@ export class BookingsService {
         throw new ConflictException("This slot has already been booked");
       throw e;
     }
-    return { ...(await this.get(reference, token)), accessToken: token };
+    return this.get(reference, user.id);
   }
-  async get(reference: string, token: string) {
-    const [b] = await db.query(select + " WHERE b.reference=?", [reference]);
-    if (!b || !token || !equal(b.access_hash, hash(token)))
-      throw new UnauthorizedException("Booking access is invalid");
-    delete b.access_hash;
+  async mine(userId: number) {
+    return db.query(select + " WHERE b.user_id=? ORDER BY b.created_at DESC", [
+      userId,
+    ]);
+  }
+  async get(reference: string, userId: number) {
+    const [b] = await db.query(
+      select + " WHERE b.reference=? AND b.user_id=?",
+      [reference, userId],
+    );
+    if (!b) throw new NotFoundException("Booking not found");
     return b;
   }
-  async cancel(reference: string, token: string) {
-    await this.get(reference, token);
+  async cancel(reference: string, userId: number) {
+    await this.get(reference, userId);
     await db.transaction(async (m) => {
       const [b] = await m.query(
         "SELECT slot_id FROM bookings WHERE reference=?",
@@ -97,7 +100,7 @@ export class BookingsService {
         [reference],
       );
     });
-    return this.get(reference, token);
+    return this.get(reference, userId);
   }
   async list(filters: any) {
     const where = ["1=1"];

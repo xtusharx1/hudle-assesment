@@ -7,6 +7,7 @@ import {
   useParams,
   useNavigate,
   useLocation,
+  useSearchParams,
 } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -42,9 +43,8 @@ import {
   today,
   dateLabel,
   timeLabel,
-  savedBookings,
-  saveBooking,
 } from "./api";
+import { AuthPage, RequireUser, useAuth } from "./Auth";
 import Admin from "./Admin";
 import { Status } from "./Status";
 import { BookingPending } from "./BookingPending";
@@ -78,6 +78,7 @@ function RouteScroll() {
   return null;
 }
 export default function App() {
+  const { user, logout } = useAuth();
   const [menu, setMenu] = useState(false);
   return (
     <>
@@ -95,6 +96,25 @@ export default function App() {
           </NavLink>
         </nav>
         <div className="header-right">
+          {user ? (
+            <div className="account-nav">
+              <Link to="/my-bookings">Hi, {user.name.split(" ")[0]}</Link>
+              <button
+                className="text-btn"
+                onClick={() =>
+                  logout().catch(() =>
+                    window.alert("Could not sign out. Please try again."),
+                  )
+                }
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <Link className="account-signin" to="/login">
+              Sign in ↗
+            </Link>
+          )}
           <span className="city">
             <MapPin size={15} /> Delhi NCR
           </span>
@@ -113,8 +133,24 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Discover />} />
         <Route path="/venues/:id" element={<VenueDetails />} />
-        <Route path="/booking/:reference" element={<Confirmation />} />
-        <Route path="/my-bookings" element={<MyBookings />} />
+        <Route
+          path="/booking/:reference"
+          element={
+            <RequireUser>
+              <Confirmation />
+            </RequireUser>
+          }
+        />
+        <Route
+          path="/my-bookings"
+          element={
+            <RequireUser>
+              <MyBookings />
+            </RequireUser>
+          }
+        />
+        <Route path="/login" element={<AuthPage />} />
+        <Route path="/register" element={<AuthPage register />} />
         <Route path="/admin/*" element={<Admin />} />
         <Route
           path="*"
@@ -507,12 +543,22 @@ function VenueCard({ venue: v, index }: { venue: Venue; index: number }) {
 }
 function VenueDetails() {
   const { id } = useParams();
-  const [date, setDate] = useState(today());
+  const [params] = useSearchParams();
+  const requestedDate = params.get("date");
+  const initialDate =
+    requestedDate &&
+    /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) &&
+    requestedDate >= today()
+      ? requestedDate
+      : today();
+  const restoredSlot = useRef(false);
+  const [date, setDate] = useState(initialDate);
   const [dateWasChosen, setDateWasChosen] = useState(false);
   const [clock, setClock] = useState(Date.now);
   useEffect(() => {
-    setDate(today());
-    setDateWasChosen(false);
+    setDate(initialDate);
+    setDateWasChosen(Boolean(requestedDate));
+    restoredSlot.current = false;
   }, [id]);
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 15000);
@@ -542,6 +588,16 @@ function VenueDetails() {
     new Date(Date.parse(today()) + i * 86400000).toISOString().slice(0, 10),
   );
   useEffect(() => setSelected(null), [date]);
+  useEffect(() => {
+    if (!restoredSlot.current && slots.data) {
+      const match = slots.data.find(
+        (s) =>
+          s.id === Number(params.get("slot")) && s.availability === "AVAILABLE",
+      );
+      if (match) setSelected(match);
+      restoredSlot.current = true;
+    }
+  }, [slots.data, params]);
   const amenities = v
     ? (typeof v.amenities === "string"
         ? JSON.parse(v.amenities)
@@ -706,31 +762,24 @@ function BookingForm({
   onConflict: () => void;
 }) {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const client = useQueryClient();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const submitting = useRef(false);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!slot || submitting.current) return;
+    if (!slot || !user || submitting.current) return;
     submitting.current = true;
     setError("");
     setPending(true);
-    const f = new FormData(e.currentTarget);
     // Send immediately; keep the visual transition on screen for at least two seconds.
     // allSettled also preserves the animation duration for failed requests.
     const request = api<Booking>("/bookings", {
       method: "POST",
       body: JSON.stringify({
         slotId: slot.id,
-        name: f.get("name"),
-        phone: f.get("phone"),
-        ...(f.get("email") ? { email: f.get("email") } : {}),
       }),
-    }).then((b) => {
-      // Preserve access as soon as the reservation succeeds, even during the animation.
-      saveBooking(b.reference, b.accessToken!);
-      return b;
     });
     try {
       const [result] = await Promise.allSettled([
@@ -739,6 +788,7 @@ function BookingForm({
       ]);
       if (result.status === "rejected") throw result.reason;
       client.invalidateQueries({ queryKey: ["slots"] });
+      client.invalidateQueries({ queryKey: ["my-bookings"] });
       navigate("/booking/" + result.value.reference);
     } catch (e: any) {
       setError(e.message);
@@ -769,43 +819,13 @@ function BookingForm({
           {venue.name} · {venue.sport}
         </small>
       </div>
-      <label>
-        Your name
-        <input
-          name="name"
-          placeholder="What should we call you?"
-          required
-          minLength={2}
-          maxLength={100}
-          autoComplete="name"
-        />
-      </label>
-      <label>
-        Phone number
-        <div className="phone-input">
-          <span>+91</span>
-          <input
-            name="phone"
-            aria-label="Phone number"
-            placeholder="98765 43210"
-            required
-            pattern="[6-9][0-9]{9}"
-            title="Enter a 10-digit Indian mobile number without spaces"
-            maxLength={10}
-            inputMode="tel"
-            autoComplete="tel-national"
-          />
+      {user && (
+        <div className="account-details">
+          <strong>Booking as {user.name}</strong>
+          <span>{user.email}</span>
+          <span>+91 {user.phone}</span>
         </div>
-      </label>
-      <label>
-        Email <small>(optional)</small>
-        <input
-          name="email"
-          placeholder="For your records"
-          type="email"
-          autoComplete="email"
-        />
-      </label>
+      )}
       <div className="total">
         <span>
           Total <small>All inclusive</small>
@@ -817,32 +837,45 @@ function BookingForm({
           {error}
         </div>
       )}
-      <button className="btn full" disabled={!slot || pending}>
-        {pending ? "Reserving your court…" : "Confirm booking"}
-        <ArrowUpRight size={19} />
-      </button>
+      {user ? (
+        <button className="btn full" disabled={!slot || pending}>
+          {pending ? "Reserving your court…" : "Confirm booking"}
+          <ArrowUpRight size={19} />
+        </button>
+      ) : (
+        <Link
+          className="btn full"
+          to={
+            "/login?next=" +
+            encodeURIComponent(
+              `/venues/${venue.id}?date=${date}${slot ? `&slot=${slot.id}` : ""}`,
+            )
+          }
+        >
+          {loading ? "Loading account…" : "Sign in to book"}
+          <ArrowUpRight size={19} />
+        </Link>
+      )}
       <p className="secure-note">
         <ShieldCheck size={13} />
         Instant confirmation. No hidden charges.
       </p>
       <p className="browser-note">
-        Your bookings are saved securely in this browser. Keep access to this
-        device to manage them.
+        Your bookings are linked to your account. Sign in on any device to
+        manage them.
       </p>
     </form>
   );
 }
 function useBooking(ref: string) {
-  const token = savedBookings()[ref];
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["booking", ref],
-    queryFn: () =>
-      api<Booking>("/bookings/" + ref, {
-        headers: { "x-booking-token": token || "" },
-      }),
+    queryKey: ["booking", user?.id, ref],
+    queryFn: () => api<Booking>("/bookings/" + ref),
     retry: false,
   });
 }
+
 function Confirmation() {
   const { reference = "" } = useParams();
   const { data: b, error, isPending } = useBooking(reference);
@@ -921,28 +954,14 @@ function Confirmation() {
   );
 }
 function MyBookings() {
-  const refs = Object.keys(savedBookings());
+  const { user } = useAuth();
   const [tab, setTab] = useState("upcoming");
   const query = useQuery({
-    queryKey: ["my-bookings", refs.join(",")],
-    queryFn: async () => {
-      const results = await Promise.allSettled(
-        refs.map((r) =>
-          api<Booking>("/bookings/" + r, {
-            headers: { "x-booking-token": savedBookings()[r] },
-          }),
-        ),
-      );
-      const failed = results.filter((r) => r.status === "rejected");
-      if (failed.length === results.length && results.length)
-        throw (failed[0] as PromiseRejectedResult).reason;
-      return {
-        bookings: results.flatMap((r) =>
-          r.status === "fulfilled" ? [r.value] : [],
-        ),
-        failed: failed.length,
-      };
-    },
+    queryKey: ["my-bookings", user?.id],
+    queryFn: async () => ({
+      bookings: await api<Booking[]>("/bookings"),
+      failed: 0,
+    }),
   });
   const [cancel, setCancel] = useState<Booking | null>(null);
   const client = useQueryClient();
@@ -950,7 +969,6 @@ function MyBookings() {
     mutationFn: (b: Booking) =>
       api<Booking>(`/bookings/${b.reference}/cancel`, {
         method: "POST",
-        headers: { "x-booking-token": savedBookings()[b.reference] },
       }),
     onSuccess: () => {
       setCancel(null);
@@ -1064,8 +1082,8 @@ function MyBookings() {
         ))}
       </div>
       <p className="browser-note">
-        Bookings are private to this browser. Phone numbers alone cannot access
-        or cancel them.
+        Bookings belong to your account. Sign in on any device to view or manage
+        your games.
       </p>
       {cancel && (
         <div

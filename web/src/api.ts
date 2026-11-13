@@ -37,7 +37,6 @@ export interface Booking {
   location: string;
   address: string;
   image_url: string;
-  accessToken?: string;
 }
 export class ApiError extends Error {
   constructor(
@@ -47,14 +46,33 @@ export class ApiError extends Error {
     super(message);
   }
 }
+let refreshing: Promise<boolean> | null = null;
 export async function api<T>(
   path: string,
   options: RequestInit = {},
+  retried = false,
 ): Promise<T> {
   const r = await fetch((import.meta.env.VITE_API_URL || "") + "/api" + path, {
     ...options,
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...options.headers },
   });
+  if (
+    r.status === 401 &&
+    !retried &&
+    !path.startsWith("/admin") &&
+    (!path.startsWith("/auth/") || path === "/auth/me")
+  ) {
+    if (!refreshing)
+      refreshing = api("/auth/refresh", { method: "POST" }, true)
+        .then(() => true)
+        .catch(() => false)
+        .finally(() => {
+          refreshing = null;
+        });
+    if (await refreshing) return api<T>(path, options, true);
+    window.dispatchEvent(new Event("hudle-session-expired"));
+  }
   const data = await r.json();
   if (!r.ok)
     throw new ApiError(
@@ -98,16 +116,3 @@ export const timeLabel = (t: string) => {
   const h = Number(t.slice(0, 2));
   return `${h % 12 || 12}:${t.slice(3, 5)} ${h >= 12 ? "PM" : "AM"}`;
 };
-export function savedBookings(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem("hudle-bookings") || "{}");
-  } catch {
-    return {};
-  }
-}
-export function saveBooking(ref: string, token: string) {
-  localStorage.setItem(
-    "hudle-bookings",
-    JSON.stringify({ ...savedBookings(), [ref]: token }),
-  );
-}

@@ -8,7 +8,7 @@ import {
   Body,
   Param,
   Query,
-  Headers,
+  Req,
   ParseIntPipe,
   UseGuards,
   UnauthorizedException,
@@ -26,6 +26,7 @@ import {
   SlotPatchDto,
   GenerateDto,
 } from "./dtos";
+import { UserGuard, UserRequest } from "./auth";
 import { today } from "./time";
 @Controller("api")
 export class PublicController {
@@ -51,20 +52,26 @@ export class PublicController {
   ) {
     return this.catalog.slots(id, date || today());
   }
-  @Post("bookings") book(@Body() b: BookingDto) {
-    return this.bookings.create(b);
-  }
-  @Get("bookings/:reference") get(
-    @Param("reference") ref: string,
-    @Headers("x-booking-token") token: string,
+  @Post("bookings") @UseGuards(UserGuard) book(
+    @Body() b: BookingDto,
+    @Req() req: UserRequest,
   ) {
-    return this.bookings.get(ref, token);
+    return this.bookings.create(b, req.user);
   }
-  @Post("bookings/:reference/cancel") @HttpCode(200) cancel(
+  @Get("bookings") @UseGuards(UserGuard) mine(@Req() req: UserRequest) {
+    return this.bookings.mine(req.user.id);
+  }
+  @Get("bookings/:reference") @UseGuards(UserGuard) get(
     @Param("reference") ref: string,
-    @Headers("x-booking-token") token: string,
+    @Req() req: UserRequest,
   ) {
-    return this.bookings.cancel(ref, token);
+    return this.bookings.get(ref, req.user.id);
+  }
+  @Post("bookings/:reference/cancel")
+  @HttpCode(200)
+  @UseGuards(UserGuard)
+  cancel(@Param("reference") ref: string, @Req() req: UserRequest) {
+    return this.bookings.cancel(ref, req.user.id);
   }
 }
 @Controller("api/admin")

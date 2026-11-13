@@ -3190,3 +3190,201 @@ footer {
     transform: scaleX(0.75);
   }
 }
+
+/* Account access shares the venue discovery typography and court-green palette. */
+.auth-page {
+  max-width: 1160px;
+  margin: 56px auto 80px;
+  padding: 0 28px;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 64px;
+  align-items: center;
+  min-height: 650px;
+}
+.auth-story {
+  border-radius: 26px;
+  background: #123e31;
+  color: #fff;
+  padding: 54px 42px;
+  position: relative;
+  overflow: hidden;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.auth-story:after {
+  content: "";
+  position: absolute;
+  width: 290px;
+  height: 290px;
+  border: 1px solid #ffffff24;
+  border-radius: 50%;
+  right: -155px;
+  bottom: -100px;
+  box-shadow:
+    0 0 0 44px #ffffff07,
+    0 0 0 88px #ffffff05;
+  pointer-events: none;
+}
+.auth-story .eyebrow {
+  color: #d4f47a;
+}
+.auth-story h1 {
+  font-size: clamp(38px, 4.4vw, 58px);
+  line-height: 1.12;
+  letter-spacing: -2px;
+  margin: 24px 0;
+}
+.auth-story h1 em {
+  font-style: normal;
+  color: #d4f47a;
+}
+.auth-story p {
+  color: #d2e0d9;
+  line-height: 1.7;
+  max-width: 320px;
+}
+.auth-perks {
+  display: grid;
+  gap: 19px;
+  margin-top: 34px;
+  font-size: 14px;
+  color: #e4efea;
+}
+.auth-card {
+  padding: 26px 8px;
+}
+.auth-card h2 {
+  font-size: 30px;
+  letter-spacing: -1px;
+  line-height: 1.2;
+  margin: 14px 0;
+}
+.auth-card > p {
+  color: #6c7771;
+  line-height: 1.6;
+}
+.auth-card form {
+  display: grid;
+  gap: 18px;
+  margin-top: 26px;
+}
+.auth-card label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.auth-card input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dce3dc;
+  background: #fff;
+  border-radius: 9px;
+  padding: 14px;
+  font: inherit;
+  font-size: 14px;
+  color: #193c30;
+}
+.auth-card input:focus {
+  outline: 2px solid #297253;
+  outline-offset: 2px;
+}
+.auth-card .phone-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid #dce3dc;
+  border-radius: 9px;
+}
+.auth-card .phone-input span {
+  padding-left: 14px;
+  color: #708078;
+}
+.auth-card .phone-input input {
+  border: 0;
+  min-width: 0;
+}
+.auth-card .auth-switch {
+  margin: 24px 0 16px;
+  font-size: 14px;
+}
+.auth-switch a {
+  color: #196345;
+  font-weight: 700;
+}
+.auth-card .secure-note {
+  justify-content: flex-start;
+  font-size: 12px;
+}
+.account-nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.account-nav .text-btn {
+  font-size: 12px;
+  color: #c2d8df;
+}
+.account-signin {
+  font-size: 14px;
+  font-weight: 700;
+  color: #b7f1e7;
+  white-space: nowrap;
+}
+.account-details {
+  display: grid;
+  gap: 6px;
+  margin: 22px 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: #f3f7f0;
+  font-size: 13px;
+}
+.account-details span {
+  color: #68746d;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 800px) {
+  .auth-page {
+    gap: 24px;
+    padding: 0 20px;
+    margin: 28px auto 48px;
+    grid-template-columns: 1fr;
+    max-width: 520px;
+    min-height: 0;
+  }
+  .auth-story {
+    padding: 28px;
+  }
+  .auth-story h1 {
+    font-size: 36px;
+    margin: 14px 0;
+  }
+  .auth-story p,
+  .auth-perks {
+    display: none;
+  }
+  .auth-card {
+    padding: 16px 4px;
+  }
+  .account-nav {
+    gap: 10px;
+  }
+  .account-nav > a {
+    max-width: 105px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+  .header-right .city {
+    display: none;
+  }
+}
+
+.header .account-nav > a {
+  color: #e2f4f1;
+}
