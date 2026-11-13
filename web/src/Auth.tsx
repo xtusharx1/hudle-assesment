@@ -217,8 +217,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         "/admin/login",
         { method: "POST", body: JSON.stringify(body) },
       );
-      // End the player session before entering the admin role; logout must not reveal a hidden second account.
-      await api("/auth/logout", { method: "POST" });
       return login;
     });
     sessionStorage.setItem("hudle-admin", result.token);

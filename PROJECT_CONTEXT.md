@@ -41,6 +41,8 @@ Customers register with name, normalized unique email, Indian mobile number and 
 
 The single admin account comes from environment variables. Its eight-hour JWT is stored in session storage and validated through `/api/admin/me`. A shared frontend auth provider resolves loading, guest, customer or admin state. Entering admin mode revokes the current customer session; logout clears the active role and private query caches.
 
+Backend access is enforced by the global `RbacGuard` with explicit `@Public()` and `@Roles()` metadata; unannotated routes deny access. Valid credentials with the wrong role return 403, invalid/missing credentials return 401. Admin JWTs require their own issuer/audience and HS256. Admin login revokes the current customer session on the server. Booking ownership remains enforced in the booking service.
+
 Historical guest bookings remain admin-visible and are not automatically assigned by matching phone/email. Favourites are browser-local.
 
 ## Frontend behavior
@@ -68,4 +70,4 @@ Historical guest bookings remain admin-visible and are not automatically assigne
 
 ## Verification
 
-Run `npm run build` and `DB_NAME=hudle_test npm test`. The suite has 30 real-MySQL API tests and 27 frontend tests covering booking conflicts, cancellation, authentication, validation, dates, formatting and role-based navigation. Tests may reset only a separate database ending in `_test`; never reset the normal app database for verification.
+Run `npm run build` and `DB_NAME=hudle_test npm test`. The suite has 37 real-MySQL API tests and 27 frontend tests covering booking conflicts, cancellation, authentication, validation, dates, formatting and role-based navigation. Tests may reset only a separate database ending in `_test`; never reset the normal app database for verification.

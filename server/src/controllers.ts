@@ -9,15 +9,15 @@ import {
   Param,
   Query,
   Req,
+  Res,
   ParseIntPipe,
-  UseGuards,
   UnauthorizedException,
   HttpCode,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { CatalogService } from "./catalog";
 import { BookingsService } from "./bookings";
-import { AdminGuard, equal } from "./common";
+import { equal } from "./common";
 import {
   BookingDto,
   LoginDto,
@@ -29,7 +29,9 @@ import {
   DateQueryDto,
   BookingQueryDto,
 } from "./dtos";
-import { UserGuard, UserRequest } from "./auth";
+import { AuthService, UserRequest } from "./auth";
+import { Request, Response } from "express";
+import { Public, Roles } from "./access";
 import { today } from "./time";
 @Controller("api")
 export class PublicController {
@@ -37,34 +39,41 @@ export class PublicController {
     private catalog: CatalogService,
     private bookings: BookingsService,
   ) {}
-  @Get("health") health() {
+  @Public()
+  @Get("health")
+  health() {
     return { status: "ok", timezone: "Asia/Kolkata" };
   }
-  @Get("venues") venues(@Query() q: VenueQueryDto) {
+  @Public()
+  @Get("venues")
+  venues(@Query() q: VenueQueryDto) {
     return this.catalog.venues(q);
   }
-  @Get("venue-filters") filters() {
+  @Public()
+  @Get("venue-filters")
+  filters() {
     return this.catalog.filters();
   }
-  @Get("venues/:id") venue(@Param("id", ParseIntPipe) id: number) {
+  @Public()
+  @Get("venues/:id")
+  venue(@Param("id", ParseIntPipe) id: number) {
     return this.catalog.venue(id);
   }
-  @Get("venues/:id/slots") slots(
-    @Param("id", ParseIntPipe) id: number,
-    @Query() q: DateQueryDto,
-  ) {
+  @Public()
+  @Get("venues/:id/slots")
+  slots(@Param("id", ParseIntPipe) id: number, @Query() q: DateQueryDto) {
     return this.catalog.slots(id, q.date || today());
   }
-  @Post("bookings") @UseGuards(UserGuard) book(
+  @Post("bookings") @Roles("customer") book(
     @Body() b: BookingDto,
     @Req() req: UserRequest,
   ) {
     return this.bookings.create(b, req.user);
   }
-  @Get("bookings") @UseGuards(UserGuard) mine(@Req() req: UserRequest) {
+  @Get("bookings") @Roles("customer") mine(@Req() req: UserRequest) {
     return this.bookings.mine(req.user.id);
   }
-  @Get("bookings/:reference") @UseGuards(UserGuard) get(
+  @Get("bookings/:reference") @Roles("customer") get(
     @Param("reference") ref: string,
     @Req() req: UserRequest,
   ) {
@@ -72,28 +81,46 @@ export class PublicController {
   }
   @Post("bookings/:reference/cancel")
   @HttpCode(200)
-  @UseGuards(UserGuard)
+  @Roles("customer")
   cancel(@Param("reference") ref: string, @Req() req: UserRequest) {
     return this.bookings.cancel(ref, req.user.id);
   }
 }
 @Controller("api/admin")
 export class LoginController {
-  constructor(private jwt: JwtService) {}
-  @Post("login") @HttpCode(200) login(@Body() b: LoginDto) {
+  constructor(
+    private jwt: JwtService,
+    private auth: AuthService,
+  ) {}
+  @Public()
+  @Post("login")
+  @HttpCode(200)
+  async login(
+    @Body() b: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     if (
       !equal(b.username, process.env.ADMIN_USERNAME || "admin") ||
       !equal(b.password, process.env.ADMIN_PASSWORD || "PlayWithHudle!2026")
     )
       throw new UnauthorizedException("Incorrect username or password");
+    await this.auth.logout(req, res);
     return {
-      token: this.jwt.sign({ role: "admin" }),
+      token: this.jwt.sign(
+        { role: "admin", sub: process.env.ADMIN_USERNAME || "admin" },
+        {
+          issuer: "hudle-api",
+          audience: "hudle-admin",
+          algorithm: "HS256",
+        },
+      ),
       username: process.env.ADMIN_USERNAME || "admin",
     };
   }
 }
 @Controller("api/admin")
-@UseGuards(AdminGuard)
+@Roles("admin")
 export class AdminController {
   constructor(
     private catalog: CatalogService,

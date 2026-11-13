@@ -1,6 +1,6 @@
 import { Module, ValidationPipe, INestApplication } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
-import { AuthService, AuthController, UserGuard } from "./auth";
+import { AuthService, AuthController } from "./auth";
 import helmet from "helmet";
 import {
   PublicController,
@@ -9,7 +9,9 @@ import {
 } from "./controllers";
 import { CatalogService } from "./catalog";
 import { BookingsService } from "./bookings";
-import { AdminGuard, Errors } from "./common";
+import { Errors } from "./common";
+import { APP_GUARD } from "@nestjs/core";
+import { RbacGuard } from "./rbac";
 if (
   process.env.NODE_ENV === "production" &&
   (!process.env.JWT_SECRET || !process.env.ADMIN_PASSWORD)
@@ -33,9 +35,8 @@ if (
   providers: [
     CatalogService,
     BookingsService,
-    AdminGuard,
     AuthService,
-    UserGuard,
+    { provide: APP_GUARD, useClass: RbacGuard },
   ],
 })
 export class AppModule {}

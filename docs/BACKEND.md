@@ -39,6 +39,12 @@ UNIQUE KEY one_active_booking_per_slot (active_slot_id)
 
 Cancellation changes status to `CANCELLED`; the generated value becomes NULL. The old row stays while the slot becomes bookable. The duplicate occupancy constraint is translated to HTTP 409. The API does not accept the client's price or confirmation status.
 
+## Role-based access
+
+The global `RbacGuard` enforces `@Public()` and `@Roles("customer" | "admin")` metadata. Unannotated endpoints deny access. Venue discovery and authentication endpoints are public; customer profile/bookings require a live customer session; admin operations require an admin bearer JWT. Valid credentials with an unauthorized role return 403, while missing, malformed or expired credentials return 401. An explicit invalid bearer token never falls back to a customer cookie.
+
+Admin JWTs require issuer `hudle-api`, audience `hudle-admin`, HS256 and an admin subject/role. Successful admin login revokes the current customer session and clears its cookies. Customer JWTs use a separate audience and remain tied to database sessions. Booking ownership checks continue to restrict customers to their own records.
+
 ## Customer authentication and ownership
 
 `auth.ts` implements registration, login, access verification, refresh rotation and logout. Name/email/mobile are validated; email is lowercase and unique. Passwords have 10–128 characters and use scrypt with a random 16-byte salt, N=32768, r=8, p=1, and a 64-byte key. Invalid login uses a generic response and performs a password derivation even for missing accounts.

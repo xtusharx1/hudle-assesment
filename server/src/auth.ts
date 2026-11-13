@@ -1,7 +1,5 @@
 import {
   Injectable,
-  CanActivate,
-  ExecutionContext,
   UnauthorizedException,
   ConflictException,
   Controller,
@@ -10,7 +8,6 @@ import {
   Body,
   Req,
   Res,
-  UseGuards,
   HttpCode,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
@@ -23,6 +20,7 @@ import {
 import { Request, Response } from "express";
 import { db } from "./database/source";
 import { hash } from "./common";
+import { Public, Roles } from "./access";
 import { RegisterDto, UserLoginDto } from "./dtos";
 export interface User {
   id: number;
@@ -215,43 +213,33 @@ export class AuthService {
     }
   }
 }
-@Injectable()
-export class UserGuard implements CanActivate {
-  constructor(private auth: AuthService) {}
-  async canActivate(ctx: ExecutionContext) {
-    const req = ctx.switchToHttp().getRequest<UserRequest>();
-    req.user = await this.auth.authenticate(req);
-    return true;
-  }
-}
 @Controller("api/auth")
 export class AuthController {
   constructor(private auth: AuthService) {}
-  @Post("register") register(
-    @Body() b: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  @Public()
+  @Post("register")
+  register(@Body() b: RegisterDto, @Res({ passthrough: true }) res: Response) {
     return this.auth.register(b, res);
   }
-  @Post("login") @HttpCode(200) login(
-    @Body() b: UserLoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  @Public()
+  @Post("login")
+  @HttpCode(200)
+  login(@Body() b: UserLoginDto, @Res({ passthrough: true }) res: Response) {
     return this.auth.login(b, res);
   }
-  @Post("refresh") @HttpCode(200) refresh(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  @Public()
+  @Post("refresh")
+  @HttpCode(200)
+  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.auth.refresh(req, res);
   }
-  @Post("logout") @HttpCode(200) logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  @Public()
+  @Post("logout")
+  @HttpCode(200)
+  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.auth.logout(req, res);
   }
-  @Get("me") @UseGuards(UserGuard) me(
+  @Get("me") @Roles("customer") me(
     @Req() req: UserRequest,
     @Res({ passthrough: true }) res: Response,
   ) {

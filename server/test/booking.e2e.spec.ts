@@ -1,10 +1,16 @@
 import "reflect-metadata";
 import { Test } from "@nestjs/testing";
-import { INestApplication } from "@nestjs/common";
+import { Controller, Get, INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { AppModule, configure } from "../src/app";
 import { db } from "../src/database/source";
 import { today } from "../src/time";
+@Controller("api/rbac-test")
+class UnannotatedController {
+  @Get() closed() {
+    return { shouldNeverBeReturned: true };
+  }
+}
 let app: INestApplication;
 let admin: string;
 let player: ReturnType<typeof request.agent>;
@@ -26,6 +32,7 @@ beforeAll(async () => {
   await db.query("DELETE FROM venues");
   const module = await Test.createTestingModule({
     imports: [AppModule],
+    controllers: [UnannotatedController],
   }).compile();
   app = module.createNestApplication();
   configure(app);
@@ -310,7 +317,7 @@ it("hashes passwords, normalizes email, and issues only HttpOnly session cookies
     .send({ email: input.email, password: input.password })
     .expect(200);
   await agent.get("/api/auth/me").expect(200);
-  await agent.get("/api/admin/venues").expect(401);
+  await agent.get("/api/admin/venues").expect(403);
 });
 it("rotates refresh tokens, restores a session, and revokes access on logout", async () => {
   const agent = request.agent(app.getHttpServer());
@@ -601,5 +608,125 @@ it("identifies an admin session independently from customer login", async () => 
     username: process.env.ADMIN_USERNAME || "admin",
   });
   await request(app.getHttpServer()).get("/api/admin/me").expect(401);
-  await player.get("/api/admin/me").expect(401);
+  await player.get("/api/admin/me").expect(403);
+});
+
+it("RBAC denies every customer action to admin credentials", async () => {
+  for (const [method, path, body] of [
+    ["get", "/api/auth/me"],
+    ["get", "/api/bookings"],
+    ["get", "/api/bookings/unknown"],
+    ["post", "/api/bookings", { slotId: slot }],
+    ["post", "/api/bookings/unknown/cancel", {}],
+  ] as const) {
+    const response = await (request(app.getHttpServer()) as any)
+      [method](path)
+      .set("Authorization", "Bearer " + admin)
+      .send(body);
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("FORBIDDEN");
+  }
+});
+it("RBAC denies every admin operation to a signed-in customer", async () => {
+  for (const [method, path] of [
+    ["get", "/api/admin/me"],
+    ["get", "/api/admin/venues"],
+    ["post", "/api/admin/venues"],
+    ["put", `/api/admin/venues/${venue}`],
+    ["delete", `/api/admin/venues/${venue}`],
+    ["get", `/api/admin/venues/${venue}/slots`],
+    ["post", `/api/admin/venues/${venue}/slots`],
+    ["post", `/api/admin/venues/${venue}/slots/generate`],
+    ["patch", `/api/admin/slots/${slot}`],
+    ["delete", `/api/admin/slots/${slot}`],
+    ["get", "/api/admin/bookings"],
+  ]) {
+    const response = await (player as any)[method](path).send({});
+    expect(response.status).toBe(403);
+  }
+});
+it("RBAC rejects missing and malformed credentials without falling back to another identity", async () => {
+  await request(app.getHttpServer()).get("/api/bookings").expect(401);
+  await request(app.getHttpServer()).get("/api/admin/bookings").expect(401);
+  await player
+    .get("/api/bookings")
+    .set("Authorization", "Bearer invalid")
+    .expect(401);
+  await player
+    .get("/api/bookings")
+    .set("Authorization", "Basic invalid")
+    .expect(401);
+  await player.get("/api/bookings").expect(200);
+});
+it("RBAC rejects admin tokens with the wrong audience or an unsupported role", async () => {
+  const { JwtService } = await import("@nestjs/jwt");
+  for (const token of [
+    app
+      .get(JwtService)
+      .sign(
+        { role: "admin", sub: "admin" },
+        { issuer: "hudle-api", audience: "hudle-customer" },
+      ),
+    app
+      .get(JwtService)
+      .sign(
+        { role: "superadmin", sub: "admin" },
+        { issuer: "hudle-api", audience: "hudle-admin" },
+      ),
+  ]) {
+    await request(app.getHttpServer())
+      .get("/api/admin/venues")
+      .set("Authorization", "Bearer " + token)
+      .expect(401);
+  }
+});
+it("admin login revokes the same browser's customer session on the server", async () => {
+  const { randomUUID, randomBytes } = await import("crypto");
+  const { hash } = await import("../src/common");
+  const { JwtService } = await import("@nestjs/jwt");
+  const [u] = await db.query("SELECT id FROM users WHERE email=?", [
+    "player@example.com",
+  ]);
+  const sid = randomUUID();
+  await db.query(
+    "INSERT INTO auth_sessions(id,user_id,refresh_hash,expires_at) VALUES(?,?,?,DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 DAY))",
+    [sid, u.id, hash(randomBytes(32).toString("hex"))],
+  );
+  const access = app
+    .get(JwtService)
+    .sign(
+      { role: "customer", sub: String(u.id), sid },
+      { issuer: "hudle-api", audience: "hudle-customer" },
+    );
+  const cookie = "hudle_access=" + access;
+  await request(app.getHttpServer())
+    .post("/api/admin/login")
+    .set("Cookie", cookie)
+    .send({
+      username: process.env.ADMIN_USERNAME || "admin",
+      password: process.env.ADMIN_PASSWORD || "PlayWithHudle!2026",
+    })
+    .expect(200);
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", cookie)
+    .expect(401);
+  // Other devices remain independent.
+  await player.get("/api/auth/me").expect(200);
+});
+
+it("RBAC denies unannotated routes by default, including to admins", async () => {
+  await request(app.getHttpServer()).get("/api/rbac-test").expect(401);
+  await player.get("/api/rbac-test").expect(403);
+  await request(app.getHttpServer())
+    .get("/api/rbac-test")
+    .set("Authorization", "Bearer " + admin)
+    .expect(403);
+});
+it("a customer cannot promote their role through a booking payload", async () => {
+  await player
+    .post("/api/bookings")
+    .send({ slotId: slot, role: "admin" })
+    .expect(400);
+  await player.get("/api/admin/venues").expect(403);
 });

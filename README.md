@@ -66,7 +66,7 @@ Coverage includes:
 ## Stack and structure
 
 - React 18, TypeScript, Vite, React Router, TanStack Query, Lucide icons, custom responsive CSS.
-- NestJS controllers and injected services, class-validator DTOs, JWT admin guard, consistent exception responses.
+- NestJS controllers and injected services, class-validator DTOs, global role-based access guard, consistent exception responses.
 - TypeORM DataSource / transaction manager and explicit SQL migrations on MySQL 8.4 / InnoDB.
 - Docker Compose, Nginx, Jest, Supertest.
 
@@ -77,7 +77,8 @@ server/src/
   catalog.ts             Venue discovery, slot management, bulk generation
   bookings.ts            Account-owned booking transaction and cancellation
   auth.ts                Customer registration, JWT cookies, rotating sessions
-  common.ts              JWT guard, error filter, hashing helpers
+  access.ts / rbac.ts     Public/role declarations and global authorization guard
+  common.ts              Error filter and hashing helpers
   dtos.ts                Input contracts and validation
   time.ts                Explicit IST conversion and date validation
   database/source.ts     Connection and migration configuration
