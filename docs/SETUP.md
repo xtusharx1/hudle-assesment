@@ -50,13 +50,13 @@ Shell/Compose variables override `.env`. MySQL credentials are initialized only 
 | `DB_HOST`, `DB_USER`, `DB_NAME`    | `127.0.0.1`, `hudle`, `hudle`       | Host database connection                                   |
 | `DB_PASSWORD`                      | `hudle_local`                       | MySQL application password                                 |
 | `DB_ROOT_PASSWORD`                 | `root_local_only`                   | MySQL initialization root password                         |
-| `WEB_ORIGIN`                       | See `.env.example`                  | Comma-separated allowed browser origins                    |
+| `WEB_ORIGIN`                       | Derived from `WEB_PORT` in Docker   | Optional comma-separated browser origin override           |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | `admin`, `PlayWithHudle!2026`       | Admin credentials                                          |
 | `JWT_SECRET`                       | Development value in `.env.example` | JWT signing secret                                         |
 | `COOKIE_SECURE`                    | `false` locally                     | Set `true` for HTTPS                                       |
 | `VITE_API_URL`                     | empty                               | Optional frontend API origin, set at build time            |
 
-For a port conflict, change `WEB_PORT`, `API_PORT` or `DB_PORT`. If the web origin changes, update `WEB_ORIGIN` too. Internal Docker service addresses remain unchanged. For a host API port change, update `PORT`; Vite reads it automatically.
+For a port conflict, change `WEB_PORT`, `API_PORT` or `DB_PORT`. Compose derives the default allowed origin from `WEB_PORT`. Set `WEB_ORIGIN` only for a custom domain or additional origins; an explicit override must be updated when its port changes. Internal Docker service addresses remain unchanged. For a host API port change, update `PORT`; Vite reads it automatically.
 
 ## Demo availability
 
