@@ -6,7 +6,12 @@ import { AuthProvider } from "./Auth";
 import App from "./App";
 import "./styles/base.css";
 import "./styles/layout.css";
-import "./styles/customer.css";
+import "./styles/hero.css";
+import "./styles/venue-cards.css";
+import "./styles/discovery.css";
+import "./styles/venue-details.css";
+import "./styles/booking.css";
+import "./styles/bookings.css";
 import "./styles/admin.css";
 import "./styles/auth.css";
 const client = new QueryClient({

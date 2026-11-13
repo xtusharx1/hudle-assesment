@@ -67,31 +67,32 @@ Repricing retains historical booking amounts. Blocking a confirmed slot and dele
 
 All paths begin `/api`.
 
-| Method       | Path                                | Authorization       | Input / result                                              |
-| ------------ | ----------------------------------- | ------------------- | ----------------------------------------------------------- |
-| GET          | `/health`                           | Public              | Health and timezone                                         |
-| GET          | `/venue-filters`                    | Public              | Distinct active sports/locations                            |
-| GET          | `/venues`                           | Public              | Optional `sport`, `location`, `q` filters                   |
-| GET          | `/venues/:id`                       | Public              | Active venue details                                        |
-| GET          | `/venues/:id/slots?date=YYYY-MM-DD` | Public              | Date slots with availability state                          |
-| POST         | `/auth/register`                    | Public              | `{name,email,phone,password}` -> profile and cookies        |
-| POST         | `/auth/login`                       | Public              | `{email,password}` -> profile and cookies                   |
-| POST         | `/auth/refresh`                     | Refresh cookie      | Rotated cookies and profile                                 |
-| POST         | `/auth/logout`                      | Session cookie      | Revoke current session, clear cookies                       |
-| GET          | `/auth/me`                          | Customer JWT cookie | Current profile                                             |
-| GET          | `/bookings`                         | Customer JWT cookie | Account-owned booking history                               |
-| POST         | `/bookings`                         | Customer JWT cookie | `{slotId}` -> 201 booking                                   |
-| GET          | `/bookings/:reference`              | Customer JWT cookie | One authorized booking                                      |
-| POST         | `/bookings/:reference/cancel`       | Customer JWT cookie | Cancelled booking                                           |
-| POST         | `/admin/login`                      | Credentials         | `{username,password}` -> eight-hour JWT                     |
-| GET          | `/admin/me`                         | Admin JWT           | Current admin role and username                             |
-| GET / POST   | `/admin/venues`                     | Admin JWT           | List all / create                                           |
-| PUT / DELETE | `/admin/venues/:id`                 | Admin JWT           | Partial update (including `is_active`) / deactivate         |
-| GET / POST   | `/admin/venues/:id/slots`           | Admin JWT           | Date query / `{date,start_time,end_time,price}`             |
-| POST         | `/admin/venues/:id/slots/generate`  | Admin JWT           | `{from,to,opens,closes,duration}` -> created/skipped counts |
-| PATCH        | `/admin/slots/:id`                  | Admin JWT           | `{is_blocked?,price?}`                                      |
-| DELETE       | `/admin/slots/:id`                  | Admin JWT           | Delete only without history                                 |
-| GET          | `/admin/bookings`                   | Admin JWT           | Optional `venueId`, `date`, `status`; max 500               |
+| Method       | Path                                | Authorization       | Input / result                                                  |
+| ------------ | ----------------------------------- | ------------------- | --------------------------------------------------------------- |
+| GET          | `/health`                           | Public              | Health and timezone                                             |
+| GET          | `/venue-filters`                    | Public              | Distinct active sports/locations                                |
+| GET          | `/venues`                           | Public              | Optional `sport`, `location`, `q` filters                       |
+| GET          | `/venues/:id`                       | Public              | Active venue details                                            |
+| GET          | `/venues/:id/slots?date=YYYY-MM-DD` | Public              | Date slots with availability state                              |
+| POST         | `/auth/session`                     | Public              | Customer profile or JSON null; restores a valid refresh session |
+| POST         | `/auth/register`                    | Public              | `{name,email,phone,password}` -> profile and cookies            |
+| POST         | `/auth/login`                       | Public              | `{email,password}` -> profile and cookies                       |
+| POST         | `/auth/refresh`                     | Refresh cookie      | Rotated cookies and profile                                     |
+| POST         | `/auth/logout`                      | Session cookie      | Revoke current session, clear cookies                           |
+| GET          | `/auth/me`                          | Customer JWT cookie | Current profile                                                 |
+| GET          | `/bookings`                         | Customer JWT cookie | Account-owned booking history                                   |
+| POST         | `/bookings`                         | Customer JWT cookie | `{slotId}` -> 201 booking                                       |
+| GET          | `/bookings/:reference`              | Customer JWT cookie | One authorized booking                                          |
+| POST         | `/bookings/:reference/cancel`       | Customer JWT cookie | Cancelled booking                                               |
+| POST         | `/admin/login`                      | Credentials         | `{username,password}` -> eight-hour JWT                         |
+| GET          | `/admin/me`                         | Admin JWT           | Current admin role and username                                 |
+| GET / POST   | `/admin/venues`                     | Admin JWT           | List all / create                                               |
+| PUT / DELETE | `/admin/venues/:id`                 | Admin JWT           | Partial update (including `is_active`) / deactivate             |
+| GET / POST   | `/admin/venues/:id/slots`           | Admin JWT           | Date query / `{date,start_time,end_time,price}`                 |
+| POST         | `/admin/venues/:id/slots/generate`  | Admin JWT           | `{from,to,opens,closes,duration}` -> created/skipped counts     |
+| PATCH        | `/admin/slots/:id`                  | Admin JWT           | `{is_blocked?,price?}`                                          |
+| DELETE       | `/admin/slots/:id`                  | Admin JWT           | Delete only without history                                     |
+| GET          | `/admin/bookings`                   | Admin JWT           | Optional `venueId`, `date`, `status`; max 500                   |
 
 Admin header: `Authorization: Bearer <JWT>`. Customer cookies are sent automatically by the browser; CLI clients can use a cookie jar. JSON requests use `Content-Type: application/json`.
 
@@ -140,3 +141,7 @@ Admin credentials come from environment variables and use constant-time comparis
 The process-local limiter allows 10 login/registration requests and 300 other requests per client IP per minute. Nginx appends the connecting client to `X-Forwarded-For`; Express trusts the nearest proxy hop. Deploy behind one trusted reverse proxy and restrict direct API exposure to preserve that address boundary. Customer password hashing, cookie rotation and origin checks are described above.
 
 Venue ratings are nullable. The rating migration changes the default for new venues without overwriting existing ratings. Seeded ratings and photography are illustrative demo data. No amenities are implied when the stored list is empty.
+
+Guest identity checks use `POST /auth/session`, returning HTTP 200 with a customer profile or JSON null. Invalid/expired session cookies are cleared; protected endpoints still return 401 without credentials. Browser checks share one in-flight request and use the same cross-tab lock as refresh rotation.
+
+Demo schedule extension runs on seeding, API startup and hourly. It appends days beyond each named demo venue's recorded horizon and respects its current price. Existing slots and admin changes are preserved; deliberately cleared schedules and custom venues remain admin-managed. Customers can select any valid future date, including dates beyond the fourteen-day quick selector.

@@ -1,0 +1,194 @@
+.venue-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 27px 23px;
+}
+.venue-card {
+  background: #fff;
+  border: 1px solid #e3e8ed;
+  border-radius: 11px;
+  overflow: hidden;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.venue-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px #0c6a6310;
+}
+.card-photo {
+  height: 210px;
+  position: relative;
+  overflow: hidden;
+}
+.card-photo img {
+  transition: transform 0.4s;
+  filter: saturate(0.8);
+}
+.venue-card:hover .card-photo img {
+  transform: scale(1.04);
+}
+.sport-badge {
+  position: absolute;
+  left: 13px;
+  top: 13px;
+  background: #fffffff0;
+  padding: 5px 9px;
+  border-radius: 4px;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+.heart-btn {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #ffffffed;
+  border: 0;
+  color: #536244;
+}
+.heart-btn.liked {
+  color: #b04645;
+}
+.card-tag {
+  position: absolute;
+  bottom: 12px;
+  left: 13px;
+  background: #d7f6ef;
+  color: #0c6a63;
+  font-size: 8px;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-weight: 600;
+}
+.card-tag span {
+  margin-left: 8px;
+}
+.card-info {
+  padding: 18px 18px 14px;
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+.card-title h3 {
+  font-size: 17px;
+  margin: 0;
+}
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #0c6a63;
+  background: #e6f8f4;
+  padding: 4px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.card-info > p {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  margin: 8px 0 18px;
+}
+.card-bottom {
+  border-top: 1px solid #eef0e9;
+  padding-top: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-bottom strong {
+  font-size: 15px;
+  letter-spacing: -0.5px;
+}
+.card-bottom small {
+  font-size: 9px;
+  color: #93998c;
+}
+.card-bottom > a {
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+@media (min-width: 1500px) {
+  .card-photo {
+    height: 245px;
+  }
+}
+@media (max-width: 1100px) {
+  .card-photo {
+    height: 185px;
+  }
+}
+@media (max-width: 800px) {
+  .venue-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  .card-photo {
+    height: 200px;
+  }
+}
+@media (max-width: 560px) {
+  .venue-grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .card-photo {
+    height: 230px;
+  }
+  .card-info {
+    padding: 18px;
+  }
+  .card-title h3 {
+    font-size: 19px;
+  }
+  .card-info > p {
+    font-size: 11px;
+    margin: 9px 0 18px;
+  }
+  .card-bottom strong {
+    font-size: 17px;
+  }
+  .card-bottom > a {
+    font-size: 11px;
+  }
+  .card-bottom small {
+    font-size: 10px;
+  }
+  .sport-badge {
+    font-size: 10px;
+    padding: 6px 10px;
+  }
+  .rating {
+    font-size: 11px;
+  }
+  .card-tag {
+    font-size: 9px;
+  }
+}
+.card-photo img {
+  filter: saturate(0.95);
+}
+.card-bottom > a {
+  color: #2563eb;
+}
+.rating {
+  background: #e5f7f2;
+  color: #0c6a63;
+}

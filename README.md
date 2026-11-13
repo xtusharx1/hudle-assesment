@@ -13,7 +13,7 @@ cp .env.example .env
 docker compose up --build -d --wait
 ```
 
-Open [localhost:8080](http://localhost:8080). Migrations and demo seeds run on startup. `docker compose down` stops the app and preserves the database volume.
+Open [localhost:8080](http://localhost:8080). Host ports are configurable in `.env`. Migrations and demo seeds run on startup. `docker compose down` stops the app and preserves the database volume.
 
 ## Run locally
 

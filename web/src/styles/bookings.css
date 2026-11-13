@@ -1,0 +1,313 @@
+.confirmation {
+  text-align: center;
+  max-width: 700px;
+  padding-top: 65px;
+  padding-bottom: 70px;
+}
+.confirmation > .eyebrow {
+  justify-content: center;
+  margin-top: 20px;
+}
+.confirmation h1 {
+  margin: 15px 0;
+  font-size: 43px;
+}
+.confirmation > p {
+  font-size: 13px;
+}
+.success-circle {
+  display: grid;
+  place-items: center;
+  width: 73px;
+  height: 73px;
+  background: #d8f5ec;
+  color: #0c6a63;
+  border-radius: 50%;
+  margin: 0 auto 15px;
+  box-shadow: 0 0 0 8px #eef9f6;
+}
+.success-circle.small {
+  width: 52px;
+  height: 52px;
+  margin-bottom: 30px;
+}
+.ticket {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 27px;
+  text-align: left;
+  margin: 29px auto;
+  box-shadow: 0 6px 20px #27431608;
+}
+.ticket-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 23px;
+}
+.ticket-heading .logo {
+  font-size: 28px;
+}
+.ticket h2 {
+  font-size: 25px;
+  margin: 0 0 8px;
+}
+.ticket > p {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+.ticket-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 23px;
+  padding: 22px 0;
+}
+.ticket-grid small {
+  display: block;
+  letter-spacing: 1px;
+  font-size: 8px;
+  color: #99a18d;
+  margin-bottom: 7px;
+}
+.ticket-grid strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.ticket-reference {
+  border-top: 1px dashed #d9e1cc;
+  margin: 10px -27px -5px;
+  padding: 22px 27px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ticket-reference span {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #929c82;
+}
+.ticket-reference strong {
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.confirmation > .text-btn {
+  display: flex;
+  margin: 15px auto 0;
+}
+.my-bookings {
+  min-height: 70vh;
+  padding-top: 55px;
+  padding-bottom: 60px;
+}
+.my-bookings h1 {
+  font-size: 40px;
+  margin: 15px 0 9px;
+}
+.my-bookings > p {
+  font-size: 13px;
+}
+.tabs {
+  display: flex;
+  gap: 30px;
+  border-bottom: 1px solid var(--line);
+  margin: 30px 0;
+}
+.tabs button {
+  padding: 14px 0;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  color: #89947c;
+}
+.tabs button.active {
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 600;
+}
+.tabs button span {
+  margin-left: 6px;
+  background: #e9f1dc;
+  border-radius: 5px;
+  padding: 2px 5px;
+  font-size: 10px;
+}
+.bookings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+.booking-card {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 21px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.booking-card > img {
+  width: 160px;
+  height: 140px;
+  border-radius: 6px;
+}
+.booking-card h2 {
+  font-size: 22px;
+  margin: 12px 0 8px;
+}
+.booking-card p {
+  font-size: 11px;
+  margin: 7px 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.reference {
+  font-family: monospace;
+  font-size: 10px;
+  color: #89937d;
+  letter-spacing: 0.4px;
+}
+.booking-card-right {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: end;
+  align-self: stretch;
+  justify-content: center;
+}
+.booking-card-right > strong {
+  font-family: "Inter";
+  font-size: 23px;
+  letter-spacing: -0.6px;
+}
+@media (max-width: 800px) {
+  .booking-card {
+    gap: 15px;
+    padding: 16px;
+  }
+  .booking-card > img {
+    width: 120px;
+    height: 130px;
+  }
+  .booking-card h2 {
+    font-size: 19px;
+  }
+  .booking-card-right strong {
+    font-size: 19px;
+  }
+}
+@media (max-width: 560px) {
+  .confirmation {
+    padding-top: 45px;
+    padding-bottom: 45px;
+  }
+  .confirmation h1 {
+    font-size: 34px;
+  }
+  .confirmation > .eyebrow {
+    font-size: 8px;
+  }
+  .confirmation > p {
+    font-size: 11px;
+  }
+  .ticket {
+    padding: 22px;
+  }
+  .ticket-reference {
+    margin-left: -22px;
+    margin-right: -22px;
+    padding-left: 22px;
+    padding-right: 22px;
+    gap: 10px;
+  }
+  .ticket-reference strong {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  .ticket-reference span {
+    font-size: 7px;
+  }
+  .ticket-grid strong {
+    font-size: 11px;
+  }
+  .ticket h2 {
+    font-size: 23px;
+  }
+  .my-bookings {
+    padding-top: 35px;
+  }
+  .my-bookings h1 {
+    font-size: 35px;
+  }
+  .booking-card {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .booking-card > img {
+    width: 85px;
+    height: 100px;
+  }
+  .booking-card > div:nth-child(2) {
+    flex: 1;
+  }
+  .booking-card h2 {
+    font-size: 17px;
+    margin: 10px 0 7px;
+  }
+  .booking-card p {
+    font-size: 9px;
+    gap: 4px;
+  }
+  .booking-card .reference {
+    font-size: 8px;
+  }
+  .booking-card-right {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--line);
+    padding-top: 13px;
+    gap: 10px;
+  }
+  .booking-card-right > strong {
+    font-size: 19px;
+  }
+  .booking-card-right .text-btn {
+    font-size: 10px;
+  }
+  .booking-card .status-badge {
+    font-size: 8px;
+  }
+  .my-bookings > .eyebrow {
+    font-size: 8px;
+  }
+}
+.tabs button {
+  transition:
+    color 0.2s,
+    background 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+.tabs button:active {
+  transform: scale(0.96);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabs button {
+    transition: none !important;
+  }
+}
+
+.success-circle.cancelled {
+  background: #faeee8;
+  color: #9d4f40;
+}
