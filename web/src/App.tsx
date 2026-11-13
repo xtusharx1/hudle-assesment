@@ -45,6 +45,7 @@ import {
   timeLabel,
 } from "./api";
 import { AuthPage, RequireUser, useAuth } from "./Auth";
+import { ProfileMenu, ProfilePage } from "./Account";
 import Admin from "./Admin";
 import { Status } from "./Status";
 import { BookingPending } from "./BookingPending";
@@ -78,7 +79,7 @@ function RouteScroll() {
   return null;
 }
 export default function App() {
-  const { user, logout } = useAuth();
+  const location = useLocation();
   const [menu, setMenu] = useState(false);
   return (
     <>
@@ -96,25 +97,7 @@ export default function App() {
           </NavLink>
         </nav>
         <div className="header-right">
-          {user ? (
-            <div className="account-nav">
-              <Link to="/my-bookings">Hi, {user.name.split(" ")[0]}</Link>
-              <button
-                className="text-btn"
-                onClick={() =>
-                  logout().catch(() =>
-                    window.alert("Could not sign out. Please try again."),
-                  )
-                }
-              >
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <Link className="account-signin" to="/login">
-              Sign in ↗
-            </Link>
-          )}
+          <ProfileMenu />
           <span className="city">
             <MapPin size={15} /> Delhi NCR
           </span>
@@ -130,40 +113,50 @@ export default function App() {
           </button>
         </div>
       </header>
-      <Routes>
-        <Route path="/" element={<Discover />} />
-        <Route path="/venues/:id" element={<VenueDetails />} />
-        <Route
-          path="/booking/:reference"
-          element={
-            <RequireUser>
-              <Confirmation />
-            </RequireUser>
-          }
-        />
-        <Route
-          path="/my-bookings"
-          element={
-            <RequireUser>
-              <MyBookings />
-            </RequireUser>
-          }
-        />
-        <Route path="/login" element={<AuthPage />} />
-        <Route path="/register" element={<AuthPage register />} />
-        <Route path="/admin/*" element={<Admin />} />
-        <Route
-          path="*"
-          element={
-            <main className="page empty">
-              <h1>Out of bounds.</h1>
-              <Link className="btn" to="/">
-                Back to discovery
-              </Link>
-            </main>
-          }
-        />
-      </Routes>
+      <div className="route-transition" key={location.pathname}>
+        <Routes>
+          <Route path="/" element={<Discover />} />
+          <Route path="/venues/:id" element={<VenueDetails />} />
+          <Route
+            path="/booking/:reference"
+            element={
+              <RequireUser>
+                <Confirmation />
+              </RequireUser>
+            }
+          />
+          <Route
+            path="/my-bookings"
+            element={
+              <RequireUser>
+                <MyBookings />
+              </RequireUser>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <RequireUser>
+                <ProfilePage />
+              </RequireUser>
+            }
+          />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/register" element={<AuthPage register />} />
+          <Route path="/admin/*" element={<Admin />} />
+          <Route
+            path="*"
+            element={
+              <main className="page empty">
+                <h1>Out of bounds.</h1>
+                <Link className="btn" to="/">
+                  Back to discovery
+                </Link>
+              </main>
+            }
+          />
+        </Routes>
+      </div>
       <footer>
         <Link to="/" className="logo">
           HUDLE<span>↗</span>
@@ -431,7 +424,10 @@ function Discover() {
             </button>
           </div>
         )}
-        <div className="venue-grid">
+        <div
+          className="venue-grid content-transition"
+          key={`${sport}-${search}-${location}-${sort}`}
+        >
           {sorted.map((v, i) => (
             <VenueCard key={v.id} venue={v} index={i} />
           ))}
@@ -696,7 +692,7 @@ function VenueDetails() {
                   </span>
                 </div>
                 <Status loading={slots.isPending} error={slots.error} />
-                <div className="slots-grid">
+                <div className="slots-grid content-transition" key={date}>
                   {slots.data?.map((s) => (
                     <button
                       key={s.id}
@@ -1005,81 +1001,83 @@ function MyBookings() {
           Past & cancelled
         </button>
       </div>
-      <Status loading={query.isPending} error={query.error} />
-      {!!query.data?.failed && (
-        <div className="notice">
-          Some bookings could not be loaded. Refresh to try again.
-        </div>
-      )}
-      {bookings?.length === 0 && (
-        <div className="empty">
-          <Ticket size={44} />
-          <h2>
-            {tab === "upcoming"
-              ? "Your next game is waiting."
-              : "A clean scorecard."}
-          </h2>
-          <p>
-            {tab === "upcoming"
-              ? "You haven't booked a court yet. Let's change that."
-              : "Your past and cancelled games will appear here."}
-          </p>
-          <Link to="/" className="btn">
-            Find your game <ArrowUpRight size={18} />
-          </Link>
-        </div>
-      )}
-      <div className="bookings-list">
-        {bookings?.map((b) => (
-          <article className="booking-card" key={b.reference}>
-            <img src={b.image_url} alt={b.venue_name} />
-            <div>
-              <span
-                className={
-                  "status-badge " +
-                  (b.status === "CANCELLED" ? "cancelled" : "")
-                }
-              >
-                {b.status === "CANCELLED"
-                  ? "Cancelled"
-                  : isUpcoming(b)
-                    ? "Upcoming"
-                    : "Completed"}
-              </span>
-              <h2>
-                <Link to={"/booking/" + b.reference}>{b.venue_name}</Link>
-              </h2>
-              <p>
-                <MapPin size={14} />
-                {b.location} · {b.sport}
-              </p>
-              <p>
-                <CalendarDays size={14} />
-                {dateLabel(b.date)} <span>·</span> {timeLabel(b.start_time)} –{" "}
-                {timeLabel(b.end_time)} IST
-              </p>
-              <small className="reference">{b.reference}</small>
-            </div>
-            <div className="booking-card-right">
-              <strong>{money(b.amount)}</strong>
-              {isUpcoming(b) ? (
-                <button
-                  className="text-btn danger"
-                  onClick={() => {
-                    mutation.reset();
-                    setCancel(b);
-                  }}
+      <div className="content-transition" key={tab}>
+        <Status loading={query.isPending} error={query.error} />
+        {!!query.data?.failed && (
+          <div className="notice">
+            Some bookings could not be loaded. Refresh to try again.
+          </div>
+        )}
+        {bookings?.length === 0 && (
+          <div className="empty">
+            <Ticket size={44} />
+            <h2>
+              {tab === "upcoming"
+                ? "Your next game is waiting."
+                : "A clean scorecard."}
+            </h2>
+            <p>
+              {tab === "upcoming"
+                ? "You haven't booked a court yet. Let's change that."
+                : "Your past and cancelled games will appear here."}
+            </p>
+            <Link to="/" className="btn">
+              Find your game <ArrowUpRight size={18} />
+            </Link>
+          </div>
+        )}
+        <div className="bookings-list">
+          {bookings?.map((b) => (
+            <article className="booking-card" key={b.reference}>
+              <img src={b.image_url} alt={b.venue_name} />
+              <div>
+                <span
+                  className={
+                    "status-badge " +
+                    (b.status === "CANCELLED" ? "cancelled" : "")
+                  }
                 >
-                  Cancel booking
-                </button>
-              ) : (
-                <Link to={"/venues/" + b.venue_id} className="text-btn">
-                  Play again <ArrowUpRight size={15} />
-                </Link>
-              )}
-            </div>
-          </article>
-        ))}
+                  {b.status === "CANCELLED"
+                    ? "Cancelled"
+                    : isUpcoming(b)
+                      ? "Upcoming"
+                      : "Completed"}
+                </span>
+                <h2>
+                  <Link to={"/booking/" + b.reference}>{b.venue_name}</Link>
+                </h2>
+                <p>
+                  <MapPin size={14} />
+                  {b.location} · {b.sport}
+                </p>
+                <p>
+                  <CalendarDays size={14} />
+                  {dateLabel(b.date)} <span>·</span> {timeLabel(b.start_time)} –{" "}
+                  {timeLabel(b.end_time)} IST
+                </p>
+                <small className="reference">{b.reference}</small>
+              </div>
+              <div className="booking-card-right">
+                <strong>{money(b.amount)}</strong>
+                {isUpcoming(b) ? (
+                  <button
+                    className="text-btn danger"
+                    onClick={() => {
+                      mutation.reset();
+                      setCancel(b);
+                    }}
+                  >
+                    Cancel booking
+                  </button>
+                ) : (
+                  <Link to={"/venues/" + b.venue_id} className="text-btn">
+                    Play again <ArrowUpRight size={15} />
+                  </Link>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
       </div>
       <p className="browser-note">
         Bookings belong to your account. Sign in on any device to view or manage

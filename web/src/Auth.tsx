@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   ReactNode,
   FormEvent,
 } from "react";
@@ -14,6 +15,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { AuthTransition, AuthAction } from "./AuthTransition";
 import { api } from "./api";
 export interface User {
   id: number;
@@ -26,11 +28,25 @@ const Context = createContext<{
   loading: boolean;
   setUser: (u: User | null) => void;
   logout: () => Promise<void>;
-}>({ user: null, loading: true, setUser: () => {}, logout: async () => {} });
+  authenticate: (
+    action: "login" | "register",
+    body: Record<string, unknown>,
+  ) => Promise<User>;
+}>({
+  user: null,
+  loading: true,
+  setUser: () => {},
+  logout: async () => {},
+  authenticate: async () => {
+    throw new Error("Missing auth provider");
+  },
+});
 export const useAuth = () => useContext(Context);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null),
     [loading, setLoading] = useState(true);
+  const [transition, setTransition] = useState<AuthAction | null>(null);
+  const busy = useRef(false);
   const client = useQueryClient();
   useEffect(() => {
     let active = true;
@@ -54,8 +70,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener("hudle-session-expired", expired);
     return () => window.removeEventListener("hudle-session-expired", expired);
   }, [client]);
+  async function run<T>(
+    action: AuthAction,
+    request: () => Promise<T>,
+  ): Promise<T> {
+    if (busy.current)
+      throw new Error("Please wait for the current sign-in action.");
+    busy.current = true;
+    setTransition(action);
+    try {
+      const [result] = await Promise.allSettled([
+        request(),
+        new Promise((resolve) => window.setTimeout(resolve, 850)),
+      ]);
+      if (result.status === "rejected") throw result.reason;
+      return result.value;
+    } finally {
+      busy.current = false;
+      setTransition(null);
+    }
+  }
+  async function authenticate(
+    action: "login" | "register",
+    body: Record<string, unknown>,
+  ) {
+    const u = await run(action, () =>
+      api<User>("/auth/" + action, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    );
+    client.clear();
+    setUser(u);
+    return u;
+  }
   async function logout() {
-    await api("/auth/logout", { method: "POST" });
+    await run("logout", () => api("/auth/logout", { method: "POST" }));
     setUser(null);
     client.clear();
   }
@@ -69,9 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(u);
         },
         logout,
+        authenticate,
       }}
     >
       {children}
+      {transition && <AuthTransition action={transition} />}
     </Context.Provider>
   );
 }
@@ -94,7 +146,7 @@ export function RequireUser({ children }: { children: ReactNode }) {
   );
 }
 export function AuthPage({ register = false }: { register?: boolean }) {
-  const { user, setUser, loading } = useAuth(),
+  const { user, authenticate, loading } = useAuth(),
     navigate = useNavigate(),
     [params] = useSearchParams();
   const next = params.get("next") || "/my-bookings";
@@ -115,15 +167,11 @@ export function AuthPage({ register = false }: { register?: boolean }) {
     setPending(true);
     setError("");
     try {
-      const u = await api<User>("/auth/" + (register ? "register" : "login"), {
-        method: "POST",
-        body: JSON.stringify({
-          email: f.get("email"),
-          password: f.get("password"),
-          ...(register ? { name: f.get("name"), phone: f.get("phone") } : {}),
-        }),
+      await authenticate(register ? "register" : "login", {
+        email: f.get("email"),
+        password: f.get("password"),
+        ...(register ? { name: f.get("name"), phone: f.get("phone") } : {}),
       });
-      setUser(u);
       navigate(target, { replace: true });
     } catch (e: any) {
       setError(e.message);

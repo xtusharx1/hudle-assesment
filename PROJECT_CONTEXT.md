@@ -96,3 +96,11 @@ Prefer completing assessment flows over adding infrastructure. Redis, Elasticsea
 ## Booking transition
 
 `web/src/BookingPending.tsx` renders an accessible overlay with a court/ball animation while submitting a booking. The API request starts immediately and runs alongside a minimum two-second display timer. Both success and failure wait for that timer; requests taking longer remain pending. A synchronous ref prevents duplicate submissions, the overlay captures focus and blocks background interaction, and CSS respects reduced-motion preferences. Confirmation is shown only after API success; conflicts return to the form with the API error.
+
+## Account menu and motion
+
+`web/src/Account.tsx` owns the header profile disclosure and the protected `/profile` page. Signed-in users get four cards: My profile, My bookings, Discover venues, Sign out. Guests get Sign in, Create account, Discover venues, Venue partners. The dropdown supports Escape, outside-pointer dismissal, focus leaving the panel, route dismissal and a viewport-contained mobile layout. Profile details come from the authenticated API profile; booking totals use the account-scoped bookings query.
+
+`web/src/AuthTransition.tsx` provides the customer and partner login/logout modal animation, also used for customer registration. A native modal dialog makes the background inert and contains focus. Requests start immediately; the transition remains for at least 850ms, including failures, and longer while waiting for the server. Errors return to the form/menu. Customer actions have a synchronous concurrency guard. Logout clears UI identity only after API success.
+
+The top-level route wrapper animates when the pathname changes. Booking tabs (including empty states), discovery filters/sorting, slot dates and admin table filters animate their updated content; controls have short active/hover transitions. Motion uses CSS only. `prefers-reduced-motion` disables all new decorative animations and transitions. The existing minimum two-second booking animation remains separate.

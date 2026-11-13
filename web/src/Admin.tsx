@@ -33,13 +33,16 @@ import {
   timeLabel,
   dateLabel,
 } from "./api";
+import { AuthTransition } from "./AuthTransition";
 import { Status } from "./Status";
 export default function Admin() {
   const [signed, setSigned] = useState(!!sessionStorage.getItem("hudle-admin"));
   const navigate = useNavigate();
+  const [leaving, setLeaving] = useState(false);
   if (!signed) return <Login done={() => setSigned(true)} />;
   return (
-    <main className="page admin-page">
+    <main className="page admin-page content-transition">
+      {leaving && <AuthTransition action="logout" />}
       <div className="admin-top">
         <div>
           <span className="eyebrow green">THE OTHER SIDE OF THE GAME</span>
@@ -48,9 +51,13 @@ export default function Admin() {
         </div>
         <button
           className="text-btn"
-          onClick={() => {
+          disabled={leaving}
+          onClick={async () => {
+            setLeaving(true);
+            await new Promise((resolve) => window.setTimeout(resolve, 850));
             sessionStorage.removeItem("hudle-admin");
             setSigned(false);
+            setLeaving(false);
             navigate("/admin");
           }}
         >
@@ -84,18 +91,23 @@ function Login({ done }: { done: () => void }) {
   const [pending, setPending] = useState(false);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (pending) return;
     setPending(true);
     setError("");
     const f = new FormData(e.currentTarget);
     try {
-      const r = await api<{ token: string }>("/admin/login", {
-        method: "POST",
-        body: JSON.stringify({
-          username: f.get("username"),
-          password: f.get("password"),
+      const [result] = await Promise.allSettled([
+        api<{ token: string }>("/admin/login", {
+          method: "POST",
+          body: JSON.stringify({
+            username: f.get("username"),
+            password: f.get("password"),
+          }),
         }),
-      });
-      sessionStorage.setItem("hudle-admin", r.token);
+        new Promise((resolve) => window.setTimeout(resolve, 850)),
+      ]);
+      if (result.status === "rejected") throw result.reason;
+      sessionStorage.setItem("hudle-admin", result.value.token);
       done();
     } catch (e: any) {
       setError(e.message);
@@ -104,7 +116,8 @@ function Login({ done }: { done: () => void }) {
     }
   }
   return (
-    <main className="page login-page">
+    <main className="page login-page content-transition">
+      {pending && <AuthTransition action="login" />}
       <form onSubmit={submit} className="booking-box">
         <span className="success-circle small">
           <LockKeyhole size={24} />
@@ -558,7 +571,7 @@ function Slots() {
           {mutation.error.message}
         </div>
       )}
-      <div className="table-wrap">
+      <div className="table-wrap content-transition" key={date}>
         <table>
           <thead>
             <tr>
@@ -867,7 +880,10 @@ function Bookings() {
         </button>
       </div>
       <Status loading={query.isPending} error={query.error} />
-      <div className="table-wrap">
+      <div
+        className="table-wrap content-transition"
+        key={`${venueId}-${date}-${status}`}
+      >
         <table>
           <thead>
             <tr>
