@@ -84,6 +84,7 @@ function RouteScroll() {
 }
 export default function App() {
   const location = useLocation();
+  const isAccountPage = ["/login", "/register"].includes(location.pathname);
   const [menu, setMenu] = useState(false);
   useEffect(() => setMenu(false), [location.pathname]);
   useEffect(() => {
@@ -153,7 +154,7 @@ export default function App() {
       <div
         id="main-content"
         tabIndex={-1}
-        className="route-transition"
+        className={"route-transition" + (isAccountPage ? " auth-route" : "")}
         key={location.pathname}
       >
         <Routes>
@@ -199,15 +200,17 @@ export default function App() {
           />
         </Routes>
       </div>
-      <footer>
-        <Link to="/" className="logo">
-          HUDLE<span>↗</span>
-        </Link>
-        <span>A little less scrolling. A lot more playing.</span>
-        <small>
-          Made for the love of the game. © {new Date().getFullYear()}
-        </small>
-      </footer>
+      {!isAccountPage && (
+        <footer>
+          <Link to="/" className="logo">
+            HUDLE<span>↗</span>
+          </Link>
+          <span>A little less scrolling. A lot more playing.</span>
+          <small>
+            Made for the love of the game. © {new Date().getFullYear()}
+          </small>
+        </footer>
+      )}
     </>
   );
 }

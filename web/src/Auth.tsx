@@ -231,13 +231,13 @@ export function AuthPage({ register = false }: { register?: boolean }) {
     <main className="auth-page">
       <section className="auth-story">
         <span className="eyebrow">MAKE TIME FOR PLAY</span>
-        <h1>
+        <h2>
           Your game.
           <br />
           Your people.
           <br />
           <em>Your account.</em>
-        </h1>
+        </h2>
         <p>
           Find your next court, keep every booking together, and get back to
           what you love.
@@ -252,17 +252,20 @@ export function AuthPage({ register = false }: { register?: boolean }) {
         <span className="eyebrow green">
           {register ? "JOIN THE HUDLE" : "WELCOME BACK"}
         </span>
-        <h2>
+        <h1>
           {register
             ? "Let’s get you in the game."
             : "Ready for your next game?"}
-        </h2>
+        </h1>
         <p>
           {register
             ? "Create your account to reserve a court."
             : "Sign in to book and manage your games."}
         </p>
-        <form onSubmit={submit}>
+        <form
+          className={register ? "auth-form registration-form" : "auth-form"}
+          onSubmit={submit}
+        >
           {register && (
             <>
               <label>
@@ -295,7 +298,7 @@ export function AuthPage({ register = false }: { register?: boolean }) {
               </label>
             </>
           )}
-          <label>
+          <label className="auth-email">
             Email address
             <input
               name="email"

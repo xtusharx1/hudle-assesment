@@ -121,3 +121,7 @@ Important changes from the audit:
 - `http.ts` decodes error responses safely, including proxy HTML and null JSON. API fetches have a 20-second bound; queries expose retry actions. `VenueImage.tsx` provides a bundled photo fallback.
 
 The fictional QA venue was deactivated after testing; one cancelled QA booking and its user remain as audit history. Do not treat them as production customers or reset existing records to remove them.
+
+## Compact account screens
+
+Login and registration use an `auth-route` wrapper sized to the available viewport, without the marketing footer. Signup pairs name/mobile and password/confirmation on desktop; email spans both columns. At mobile widths the promotional panel is hidden and fields form one column. Reset global label/input margins inside `.auth-card` to avoid adding them to the grid gaps. Inputs keep at least 44px touch height, with 16px text on mobile. Do not use `overflow:hidden` or a hard fixed form height: validation errors, browser zoom, tiny viewports and the on-screen keyboard must remain scrollable when necessary. The primary account-page heading is the form title; the desktop promotional heading is secondary.
