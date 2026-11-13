@@ -53,7 +53,7 @@ A login creates an independent `auth_sessions` row with a 30-day absolute expiry
 
 Refresh locks the matching live session and replaces its token hash atomically, so the previous token cannot be reused. The frontend coordinates concurrent refresh attempts and retries an expired request once. Logout deletes the current session and clears both cookies. Auth and customer booking responses use `Cache-Control: no-store`. Mutation origins must match `WEB_ORIGIN` when supplied; SameSite cookies add CSRF protection. Serve frontend and API through one site (the provided proxies do this).
 
-All customer booking routes require `UserGuard`; the server uses the authenticated profile rather than client-supplied contact details. Lookup/cancellation include the owner ID; another user receives 404 without learning whether the reference exists. Cancellation is allowed only before the IST start and remains idempotent.
+All customer booking routes require the customer role through `RbacGuard`; the server uses the authenticated profile rather than client-supplied contact details. Lookup/cancellation include the owner ID; another user receives 404 without learning whether the reference exists. Cancellation is allowed only before the IST start and remains idempotent.
 
 `user-accounts.ts` preserves existing bookings with nullable `user_id`; historical guest rows remain admin-visible and are not claimable by phone/email. The old nullable `access_hash` column is retained for data preservation but no longer authorizes access. Verification, password reset, account editing, session management UI and automated expired-session pruning are follow-up work.
 
@@ -123,7 +123,7 @@ Migrations live in `src/database/schema.ts` `seed-batches.ts` and `user-accounts
 
 The integration suite boots NestJS against a separate real MySQL schema, exercises parallel requests, checks database occupancy, account isolation, JWT/session protection, cancellation/rebooking, slot management, validation, dynamic filters and seed batch idempotence. Run commands in [SETUP.md](SETUP.md).
 
-The assessment uses one bookable resource per venue. Payments, notifications and multi-slot bookings are outside its scope. See [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for implementation context.
+The assessment uses one bookable resource per venue. Payments, notifications and multi-slot bookings are outside its scope.
 
 ## Request details
 
