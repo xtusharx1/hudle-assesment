@@ -43,7 +43,22 @@ export function loginDestination(
     /[\\\u0000-\u001f]/.test(requested)
   )
     return fallback;
-  const path = requested.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  const rawPath = requested.split(/[?#]/)[0];
+  // Reject encoded separators and dot segments before the router/browser can
+  // normalize an apparently allowed path into a different role's route.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(rawPath);
+  } catch {
+    return fallback;
+  }
+  if (
+    /[\\%]/.test(decoded) ||
+    decoded.startsWith("//") ||
+    decoded.split("/").some((part) => part === "." || part === "..")
+  )
+    return fallback;
+  const path = decoded.replace(/\/+$/, "") || "/";
   if (role === "admin")
     return path.startsWith("/admin/") && path !== "/admin/login"
       ? requested

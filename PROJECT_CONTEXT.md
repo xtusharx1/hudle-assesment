@@ -70,4 +70,4 @@ Historical guest bookings remain admin-visible and are not automatically assigne
 
 ## Verification
 
-Run `npm run build` and `DB_NAME=hudle_test npm test`. The suite has 37 real-MySQL API tests and 27 frontend tests covering booking conflicts, cancellation, authentication, validation, dates, formatting and role-based navigation. Tests may reset only a separate database ending in `_test`; never reset the normal app database for verification.
+Run `npm run build` and `DB_NAME=hudle_test npm test`. The suite has 37 real-MySQL API tests and 28 frontend tests covering booking conflicts, cancellation, authentication, validation, dates, formatting and role-based navigation. Tests may reset only a separate database ending in `_test`; never reset the normal app database for verification.

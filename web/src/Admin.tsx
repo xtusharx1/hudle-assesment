@@ -609,7 +609,9 @@ function Slots() {
           aria-label="Slot date"
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => {
+            if (e.target.value) setDate(e.target.value);
+          }}
         />
       </label>
       {message && (

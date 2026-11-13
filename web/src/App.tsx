@@ -196,7 +196,7 @@ export default function App() {
               isAdmin ? (
                 <Navigate to="/admin/venues" replace />
               ) : (
-                <VenueDetails />
+                <VenueDetails key={location.pathname + location.search} />
               )
             }
           />
@@ -869,6 +869,10 @@ function BookingForm({
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const submitting = useRef(false);
+  useEffect(() => setError(""), [date]);
+  useEffect(() => {
+    if (slot) setError("");
+  }, [slot?.id]);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!slot || !user || submitting.current) return;

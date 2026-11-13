@@ -116,3 +116,22 @@ test("login return paths cannot redirect to another origin", () => {
         role === "admin" ? "/admin/venues" : "/my-bookings",
       );
 });
+
+test("return destinations cannot cross roles through encoded paths or dot segments", () => {
+  for (const path of [
+    "/admin/../login",
+    "/admin/%2e%2e/login",
+    "/admin/%2F..%2Fregister",
+    "/admin/%ZZ",
+  ]) {
+    assert.equal(loginDestination("admin", path), "/admin/venues");
+  }
+  for (const path of [
+    "/%61dmin/venues",
+    "/venues/../admin/venues",
+    "/%2Fexample.com",
+    "/%255cadmin",
+  ]) {
+    assert.equal(loginDestination("customer", path), "/my-bookings");
+  }
+});

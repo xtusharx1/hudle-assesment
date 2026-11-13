@@ -66,6 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null),
     [admin, setAdmin] = useState<AdminIdentity | null>(null),
     [loading, setLoading] = useState(true);
+  const [syncError, setSyncError] = useState("");
+  const syncPending = useRef(false);
   const [transition, setTransition] = useState<AuthAction | null>(null);
   const busy = useRef(false),
     version = useRef(0);
@@ -93,8 +95,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     const sync = async () => {
-      if (busy.current) return;
-      const current = version.current;
+      if (busy.current) {
+        syncPending.current = true;
+        return;
+      }
+      const current = ++version.current;
       const apply = (fn: () => void) => {
         if (active && current === version.current) fn();
       };
@@ -111,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               restoredAdminToken.current = adminToken;
             }
             apply(() => {
+              setSyncError("");
               setAdmin(identity);
               setUser(null);
             });
@@ -124,16 +130,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         const customer = await api<User>("/auth/me");
         apply(() => {
+          setSyncError("");
           setAdmin(null);
           setUser(customer);
         });
       } catch (e) {
         if (e instanceof ApiError && e.status === 401)
           apply(() => {
+            setSyncError("");
             setUser(null);
             setAdmin(null);
             clearPrivateData();
           });
+        else
+          apply(() =>
+            setSyncError(
+              e instanceof Error
+                ? e.message
+                : "Could not check your account. Please try again.",
+            ),
+          );
       } finally {
         apply(() => setLoading(false));
       }
@@ -190,6 +206,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       busy.current = false;
       setTransition(null);
       setLoading(false);
+      if (syncPending.current) {
+        syncPending.current = false;
+        // Recheck shared cookies after a cross-tab change during an animation.
+        window.setTimeout(() => window.dispatchEvent(new Event("focus")), 0);
+      }
     }
   }
   async function authenticate(
@@ -246,7 +267,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         authenticateAdmin,
       }}
     >
-      {children}
+      {syncError ? (
+        <main className="page empty" role="alert">
+          <h1>We couldn’t check your account.</h1>
+          <p>{syncError}</p>
+          <button
+            className="btn"
+            disabled={loading}
+            onClick={() => {
+              setLoading(true);
+              window.dispatchEvent(new Event("focus"));
+            }}
+          >
+            {loading ? "Checking your account…" : "Try again"}
+          </button>
+        </main>
+      ) : (
+        children
+      )}
       {transition && <AuthTransition action={transition} />}
     </Context.Provider>
   );
