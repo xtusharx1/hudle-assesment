@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import { today } from "../time";
 // Fictional assessment data. This batch runs once and never rewrites admin changes.
-const venues = [
+export const varietyVenues = [
   {
     name: "Shuttle Society",
     sport: "Badminton",
@@ -183,6 +183,15 @@ const venues = [
     duration: 60,
   },
 ];
+const venues = varietyVenues;
+export const varietySchedules = varietyVenues.map((venue) => ({
+  name: venue.name,
+  opens: venue.opens,
+  closes: venue.closes,
+  duration: venue.duration,
+  varied: true,
+}));
+
 export async function seedVariety(db: DataSource) {
   await db.transaction(async (m) => {
     const result = await m.query(

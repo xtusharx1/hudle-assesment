@@ -1,68 +1,9 @@
 import { db } from "./source";
 import { seedVariety } from "./variety";
+import { baseVenues as venues, baseSchedules } from "./demo-data";
+import { extendDemoSlots } from "./demo-slots";
+import { varietySchedules } from "./variety";
 import { today } from "../time";
-const venues = [
-  [
-    "The Rally Club",
-    "Badminton",
-    "Vasant Kunj",
-    "Pocket C, Vasant Kunj, New Delhi",
-    "A little competition. A lot of good energy. Play on tournament-grade wooden courts, under bright lights, with room for your whole crew.",
-    "/images/badminton.jpg",
-    65000,
-    ["Parking", "Changing rooms", "Equipment rental"],
-  ],
-  [
-    "Extra Time Arena",
-    "Football",
-    "Chhatarpur",
-    "100 Feet Road, Chhatarpur, New Delhi",
-    "Your evening deserves a better pitch. A premium floodlit turf made for five-a-side games and last-minute winners.",
-    "/images/football.jpg",
-    180000,
-    ["Floodlights", "Parking", "Drinking water"],
-  ],
-  [
-    "Baseline Social",
-    "Tennis",
-    "Greater Kailash",
-    "M Block, Greater Kailash II, New Delhi",
-    "Find your rhythm on beautifully maintained outdoor courts. Bring a friend, work on your serve, and stay for one more set.",
-    "/images/tennis.jpg",
-    90000,
-    ["Equipment rental", "Changing rooms", "Parking"],
-  ],
-  [
-    "The Pickle Yard",
-    "Pickleball",
-    "Saket",
-    "District Centre, Saket, New Delhi",
-    "Big rallies, small paddles, and a sport you will want to play again. A welcoming space for first-timers and regulars alike.",
-    "/images/badminton.jpg",
-    75000,
-    ["Equipment rental", "Drinking water", "Parking"],
-  ],
-  [
-    "Hoop District",
-    "Basketball",
-    "Dwarka",
-    "Sector 12, Dwarka, New Delhi",
-    "From casual shootarounds to full-court games. An outdoor court with great bounce, open skies, and proper game-day energy.",
-    "/images/basketball.jpg",
-    80000,
-    ["Floodlights", "Parking", "Changing rooms"],
-  ],
-  [
-    "Boundary House",
-    "Cricket",
-    "Gurugram",
-    "Golf Course Extension, Gurugram",
-    "Get the squad together for box cricket under the lights. Well-kept nets, a lively atmosphere, and all the space you need to swing.",
-    "/images/cricket.jpg",
-    120000,
-    ["Equipment rental", "Floodlights", "Parking"],
-  ],
-];
 async function seed() {
   await db.initialize();
   const [{ total }] = await db.query("SELECT COUNT(*) total FROM venues");
@@ -71,6 +12,7 @@ async function seed() {
       "Seed skipped: preserving existing venues and admin slot changes.",
     );
     await seedVariety(db);
+    await extendDemoSlots(db, [...baseSchedules, ...varietySchedules]);
     await db.destroy();
     return;
   }
@@ -104,7 +46,8 @@ async function seed() {
     }
   }
   await seedVariety(db);
-  console.log("Seed complete: 18 demo venues, 14 days of slots.");
+  await extendDemoSlots(db, [...baseSchedules, ...varietySchedules]);
+  console.log("Demo venues and future slots are ready.");
   await db.destroy();
 }
 seed().catch((e) => {

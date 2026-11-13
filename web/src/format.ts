@@ -20,12 +20,7 @@ export function validDate(value: string): boolean {
   );
 }
 export function bookingDate(value: string | null, current = today()): string {
-  const last = new Date(Date.parse(current) + 13 * 86400000)
-    .toISOString()
-    .slice(0, 10);
-  return value && validDate(value) && value >= current && value <= last
-    ? value
-    : current;
+  return value && validDate(value) && value >= current ? value : current;
 }
 export const dateLabel = (
   d: string,

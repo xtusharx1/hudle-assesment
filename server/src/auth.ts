@@ -189,6 +189,26 @@ export class AuthService {
     res.setHeader("Cache-Control", "no-store");
     return { success: true };
   }
+  async restoreSession(req: Request, res: Response): Promise<User | null> {
+    res.setHeader("Cache-Control", "no-store");
+    if (!cookie(req, "hudle_access") && !cookie(req, "hudle_refresh"))
+      return null;
+    try {
+      return await this.authenticate(req);
+    } catch (error) {
+      if (!(error instanceof UnauthorizedException)) throw error;
+    }
+    if (cookie(req, "hudle_refresh")) {
+      try {
+        return await this.refresh(req, res);
+      } catch (error) {
+        if (!(error instanceof UnauthorizedException)) throw error;
+      }
+    }
+    res.clearCookie("hudle_access", cookieOptions("/api"));
+    res.clearCookie("hudle_refresh", cookieOptions("/api/auth"));
+    return null;
+  }
   async authenticate(req: Request): Promise<User> {
     try {
       const payload = this.jwt.verify(cookie(req, "hudle_access"), {
@@ -216,6 +236,12 @@ export class AuthService {
 @Controller("api/auth")
 export class AuthController {
   constructor(private auth: AuthService) {}
+  @Public()
+  @Post("session")
+  @HttpCode(200)
+  async session(@Req() req: Request, @Res() res: Response) {
+    res.json(await this.auth.restoreSession(req, res));
+  }
   @Public()
   @Post("register")
   register(@Body() b: RegisterDto, @Res({ passthrough: true }) res: Response) {

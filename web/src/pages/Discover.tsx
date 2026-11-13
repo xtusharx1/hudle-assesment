@@ -141,7 +141,7 @@ export function Discover() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
               >
-                <option value="">All Delhi NCR</option>
+                <option value="">All locations</option>
                 {locations.map((l) => (
                   <option key={l}>{l}</option>
                 ))}
@@ -189,7 +189,7 @@ export function Discover() {
             <p>Find a sport you love. Discover a place to play it.</p>
           </div>
           <span className="small-label">
-            <MapPin size={15} /> In and around Delhi NCR
+            <MapPin size={15} /> Explore available locations
           </span>
         </div>
         <div className="sport-bar">

@@ -62,6 +62,20 @@ const Context = createContext<AuthContext>({
   },
 });
 export const useAuth = () => useContext(Context);
+let sessionCheck: Promise<User | null> | null = null;
+function readCustomerSession() {
+  if (!sessionCheck) {
+    const request = () => api<User | null>("/auth/session", { method: "POST" });
+    sessionCheck = (async (): Promise<User | null> => {
+      if (navigator.locks)
+        return await navigator.locks.request("hudle-refresh", request);
+      return await request();
+    })().finally(() => {
+      sessionCheck = null;
+    });
+  }
+  return sessionCheck;
+}
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null),
     [admin, setAdmin] = useState<AdminIdentity | null>(null),
@@ -128,11 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             clearPrivateData();
           }
         }
-        const customer = await api<User>("/auth/me");
+        const customer = await readCustomerSession();
         apply(() => {
           setSyncError("");
           setAdmin(null);
           setUser(customer);
+          if (!customer) clearPrivateData();
         });
       } catch (e) {
         if (e instanceof ApiError && e.status === 401)

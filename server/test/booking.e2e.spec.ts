@@ -807,3 +807,135 @@ it("limits the nearest forwarded client independently instead of sharing the pro
     .send(credentials)
     .expect(401);
 });
+
+it("checks guest sessions without unauthorized responses while protecting bookings", async () => {
+  const guest = await request(app.getHttpServer())
+    .post("/api/auth/session")
+    .expect(200);
+  expect(guest.body).toBeNull();
+  expect(guest.headers["cache-control"]).toBe("no-store");
+  const signedIn = await player.post("/api/auth/session").expect(200);
+  expect(signedIn.body.email).toBe("player@example.com");
+  const invalid = await request(app.getHttpServer())
+    .post("/api/auth/session")
+    .set("Cookie", "hudle_access=invalid; hudle_refresh=invalid")
+    .expect(200);
+  expect(invalid.body).toBeNull();
+  expect(invalid.headers["set-cookie"]).toHaveLength(2);
+  await request(app.getHttpServer()).get("/api/bookings").expect(401);
+});
+
+it("restores an expired access token through the public session check", async () => {
+  const { randomUUID, randomBytes } = await import("crypto");
+  const { hash } = await import("../src/common");
+  const { JwtService } = await import("@nestjs/jwt");
+  const [u] = await db.query("SELECT id FROM users WHERE email=?", [
+    "player@example.com",
+  ]);
+  const sid = randomUUID(),
+    refresh = randomBytes(32).toString("base64url");
+  await db.query(
+    "INSERT INTO auth_sessions(id,user_id,refresh_hash,expires_at) VALUES(?,?,?,DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 DAY))",
+    [sid, u.id, hash(refresh)],
+  );
+  const expired = app
+    .get(JwtService)
+    .sign(
+      { role: "customer", sub: String(u.id), sid },
+      { issuer: "hudle-api", audience: "hudle-customer", expiresIn: -1 },
+    );
+  const restored = await request(app.getHttpServer())
+    .post("/api/auth/session")
+    .set("Cookie", `hudle_access=${expired}; hudle_refresh=${refresh}`)
+    .expect(200);
+  expect(restored.body.email).toBe("player@example.com");
+  expect(restored.headers["set-cookie"]).toHaveLength(2);
+  await request(app.getHttpServer())
+    .post("/api/auth/refresh")
+    .set("Cookie", "hudle_refresh=" + refresh)
+    .expect(401);
+});
+
+it("extends demo schedules across days without replacing blocks, prices or deleted days", async () => {
+  const { extendDemoSlots } = await import("../src/database/demo-slots");
+  const shifted = (days: number) =>
+    new Date(Date.parse(today()) + days * 86400000).toISOString().slice(0, 10);
+  const created = await db.query(
+    "INSERT INTO venues(name,sport,location,address,price_per_hour) VALUES('Schedule Fixture','Tennis','Pune','Example Road',40000)",
+  );
+  const id = created.insertId;
+  await db.query(
+    "INSERT INTO slots(venue_id,date,start_time,end_time,price) VALUES(?,?, '10:00','11:00',40000)",
+    [id, shifted(29)],
+  );
+  const schedules = [
+    {
+      name: "Schedule Fixture",
+      opens: 10,
+      closes: 12,
+      duration: 60,
+      varied: false,
+    },
+  ];
+  await extendDemoSlots(db, schedules, shifted(30));
+  const count = async () =>
+    Number(
+      (
+        await db.query("SELECT COUNT(*) total FROM slots WHERE venue_id=?", [
+          id,
+        ])
+      )[0].total,
+    );
+  expect(await count()).toBe(29);
+  await db.query(
+    "UPDATE slots SET is_blocked=1,price=99999 WHERE venue_id=? AND date=?",
+    [id, shifted(30)],
+  );
+  await db.query("DELETE FROM slots WHERE venue_id=? AND date=?", [
+    id,
+    shifted(43),
+  ]);
+  await extendDemoSlots(db, schedules, shifted(30));
+  expect(await count()).toBe(27);
+  const [edited] = await db.query(
+    "SELECT price,is_blocked FROM slots WHERE venue_id=? AND date=? LIMIT 1",
+    [id, shifted(30)],
+  );
+  expect(edited).toMatchObject({ price: 99999, is_blocked: 1 });
+  await db.query("UPDATE venues SET price_per_hour=50125 WHERE id=?", [id]);
+  await extendDemoSlots(db, schedules, shifted(31));
+  expect(await count()).toBe(29);
+  const [fresh] = await db.query(
+    "SELECT price FROM slots WHERE venue_id=? AND date=? LIMIT 1",
+    [id, shifted(44)],
+  );
+  expect(fresh.price).toBe(50125);
+  await db.query("UPDATE venues SET is_active=0 WHERE id=?", [id]);
+  await extendDemoSlots(db, schedules, shifted(32));
+  expect(await count()).toBe(29);
+});
+
+it("books an admin-generated slot beyond the two-week quick selector", async () => {
+  const later = new Date(Date.parse(today()) + 60 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  await request(app.getHttpServer())
+    .post(`/api/admin/venues/${venue}/slots/generate`)
+    .set("Authorization", "Bearer " + admin)
+    .send({
+      from: later,
+      to: later,
+      opens: "09:00",
+      closes: "10:00",
+      duration: 60,
+    })
+    .expect(201);
+  const slots = await request(app.getHttpServer())
+    .get(`/api/venues/${venue}/slots?date=${later}`)
+    .expect(200);
+  expect(slots.body).toHaveLength(1);
+  await player
+    .post("/api/bookings")
+    .send({ slotId: slots.body[0].id })
+    .expect(201);
+});

@@ -80,7 +80,7 @@ export function VenueCard({
         </div>
         <p>
           <MapPin size={13} />
-          {v.location}, Delhi NCR
+          {v.location}
         </p>
         <div className="card-bottom">
           <span>

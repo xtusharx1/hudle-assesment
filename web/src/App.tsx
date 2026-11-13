@@ -7,7 +7,7 @@ import {
   Route,
   useLocation,
 } from "react-router-dom";
-import { ArrowUpRight, MapPin, Menu } from "lucide-react";
+import { ArrowUpRight, Menu } from "lucide-react";
 
 import { AuthPage, RequireUser, useAuth } from "./Auth";
 import { ProfileMenu, ProfilePage } from "./Account";
@@ -98,11 +98,6 @@ export default function App() {
         </nav>
         <div className="header-right">
           <ProfileMenu />
-          {!isAdmin && (
-            <span className="city">
-              <MapPin size={15} /> Delhi NCR
-            </span>
-          )}
           {role === "guest" && (
             <Link className="admin-link" to="/admin">
               For venue partners <ArrowUpRight size={15} />

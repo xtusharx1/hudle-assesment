@@ -6,7 +6,7 @@ services:
       MYSQL_USER: hudle
       MYSQL_PASSWORD: ${DB_PASSWORD:-hudle_local}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_local_only}
-    ports: ["127.0.0.1:3308:3306"]
+    ports: ["127.0.0.1:${DB_PORT:-3308}:3306"]
     volumes: ["hudle-data:/var/lib/mysql"]
     healthcheck:
       test:
@@ -32,7 +32,7 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-PlayWithHudle!2026}
       JWT_SECRET: ${JWT_SECRET:-local-compose-secret-change-before-deploy}
-      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:${WEB_PORT:-8080}}
     healthcheck:
       test:
         [
@@ -45,7 +45,7 @@ services:
       timeout: 3s
       retries: 30
       start_period: 10s
-    ports: ["127.0.0.1:3001:3001"]
+    ports: ["127.0.0.1:${API_PORT:-3001}:3001"]
     depends_on:
       db:
         condition: service_healthy
@@ -53,7 +53,7 @@ services:
     build:
       context: .
       dockerfile: web/Dockerfile
-    ports: ["127.0.0.1:8080:80"]
+    ports: ["127.0.0.1:${WEB_PORT:-8080}:80"]
     depends_on:
       api:
         condition: service_healthy

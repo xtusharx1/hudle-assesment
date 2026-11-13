@@ -138,6 +138,22 @@ export function VenueDetails() {
                   </div>
                   <span className="availability-dot">Live availability</span>
                 </div>
+                <label className="booking-date-picker">
+                  Booking date
+                  <input
+                    type="date"
+                    aria-label="Booking date"
+                    min={today()}
+                    value={date}
+                    onChange={(event) => {
+                      const chosen = bookingDate(event.target.value);
+                      if (chosen === event.target.value) {
+                        setDateWasChosen(true);
+                        setDate(chosen);
+                      }
+                    }}
+                  />
+                </label>
                 <div className="dates">
                   {dates.map((d, i) => (
                     <button
