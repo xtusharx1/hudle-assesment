@@ -170,17 +170,3 @@ Admin endpoints require `Authorization: Bearer <JWT>`; customer endpoints use Ht
 4. Visit “My bookings,” cancel the game, and check availability again.
 5. Sign in to admin, edit a venue, generate slots, change a slot price, and view bookings.
 6. Run the concurrency test and explain both the slot lock and unique database constraint.
-
-## Assessment scope
-
-One venue represents one bookable resource; separate courts require a resource entity and resource-level overlap rules. No payments, holds, notifications, email/mobile verification, password recovery, multi-slot booking, image uploads, or recurring opening-hours engine. Venue deactivation is intentionally one-way in this demo admin UI. The customer booking form stacks below slot selection on mobile rather than using a bottom sheet.
-
-Additional illustrative photography: [swimming lanes by Markus Spiske](https://unsplash.com/photos/a-row-of-blue-and-white-striped-swimming-lanes-OAg9u5E1ju0) and [table tennis by Anshul Gurjar](https://unsplash.com/photos/blue-ping-pong-table-with-white-net-Nteb1TZR4Jo), via Unsplash.
-
-## Design reference
-
-The visual direction was reviewed against [Hudle's official website](https://www.hudle.in/): teal identity, blue calls to action, Inter typography, a full-width sports hero, search by venue/sport/location, and image-led sport categories. The assessment app adapts these cues with its own layout and copy. It uses fictional demo venues and is not the official Hudle service.
-
-Venue details automatically selects tomorrow once every scheduled slot start for today has passed (IST). It checks every 15 seconds while open. Explicit date selections remain under the user's control. Run `npm run test -w web` for the six date-selection checks, including 11:55 PM and year rollover.
-
-The header profile icon shows Profile, My bookings and Log out when signed in; signed-out users see Sign in and Sign up. Signed-in users can open `/profile` to view their stored details and live booking totals. Customer and partner login/logout, customer registration, page navigation, booking tabs, discovery filters and slot-date changes include short transitions. Reduced-motion settings disable decorative motion; the UI waits for actual API success before showing an authenticated result.
