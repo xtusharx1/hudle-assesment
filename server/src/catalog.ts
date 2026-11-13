@@ -27,11 +27,13 @@ export class CatalogService {
         params.push(filters[key]);
       }
     if (filters.q) {
-      where.push("(v.name LIKE ? OR v.location LIKE ?)");
-      params.push(
-        `%${String(filters.q).slice(0, 100)}%`,
-        `%${String(filters.q).slice(0, 100)}%`,
+      const term = String(filters.q)
+        .slice(0, 100)
+        .replace(/[!%_]/g, (c) => "!" + c);
+      where.push(
+        "(v.name LIKE ? ESCAPE '!' OR v.location LIKE ? ESCAPE '!' OR v.sport LIKE ? ESCAPE '!')",
       );
+      params.push(`%${term}%`, `%${term}%`, `%${term}%`);
     }
     return db.query(
       `SELECT v.* FROM venues v WHERE ${where.join(" AND ")} ORDER BY v.id`,

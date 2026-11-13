@@ -33,30 +33,34 @@ export interface Booking {
   end_time: string;
   venue_id: number;
   venue_name: string;
+  venue_is_active: number;
   sport: string;
   location: string;
   address: string;
   image_url: string;
 }
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-  ) {
-    super(message);
-  }
-}
+import { ApiError, readResponse } from "./http";
+export { ApiError } from "./http";
 let refreshing: Promise<boolean> | null = null;
 export async function api<T>(
   path: string,
   options: RequestInit = {},
   retried = false,
 ): Promise<T> {
-  const r = await fetch((import.meta.env.VITE_API_URL || "") + "/api" + path, {
-    ...options,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...options.headers },
-  });
+  let r: Response;
+  try {
+    r = await fetch((import.meta.env?.VITE_API_URL || "") + "/api" + path, {
+      ...options,
+      credentials: "include",
+      signal: options.signal || AbortSignal.timeout(20000),
+      headers: { "Content-Type": "application/json", ...options.headers },
+    });
+  } catch {
+    throw new ApiError(
+      "Could not reach the server. Check your connection and try again.",
+      0,
+    );
+  }
   if (
     r.status === 401 &&
     !retried &&
@@ -64,24 +68,41 @@ export async function api<T>(
     (!path.startsWith("/auth/") || path === "/auth/me")
   ) {
     if (!refreshing)
-      refreshing = api("/auth/refresh", { method: "POST" }, true)
-        .then(() => true)
-        .catch(() => false)
+      refreshing = (async () => {
+        const renew = async () => {
+          // Another tab may have refreshed while this tab waited for the lock.
+          try {
+            await api("/auth/me", {}, true);
+            return true;
+          } catch (e) {
+            if (!(e instanceof ApiError) || e.status !== 401) throw e;
+          }
+          await api("/auth/refresh", { method: "POST" }, true);
+          return true;
+        };
+        return navigator.locks
+          ? navigator.locks.request("hudle-refresh", renew)
+          : renew();
+      })()
+        .catch((e) => {
+          if (e instanceof ApiError && e.status === 401) return false;
+          throw e;
+        })
         .finally(() => {
           refreshing = null;
         });
     if (await refreshing) return api<T>(path, options, true);
     window.dispatchEvent(new Event("hudle-session-expired"));
   }
-  const data = await r.json();
-  if (!r.ok)
-    throw new ApiError(
-      Array.isArray(data.error?.message)
-        ? data.error.message.join(". ")
-        : data.error?.message || "Something went wrong",
-      r.status,
-    );
-  return data;
+  if (
+    r.status === 401 &&
+    path.startsWith("/admin") &&
+    path !== "/admin/login"
+  ) {
+    sessionStorage.removeItem("hudle-admin");
+    window.dispatchEvent(new Event("hudle-admin-expired"));
+  }
+  return readResponse<T>(r);
 }
 export const adminApi = <T>(path: string, options: RequestInit = {}) =>
   api<T>("/admin" + path, {
@@ -91,28 +112,4 @@ export const adminApi = <T>(path: string, options: RequestInit = {}) =>
       ...options.headers,
     },
   });
-export const money = (paise: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(paise / 100);
-export const today = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-export const dateLabel = (
-  d: string,
-  options: Intl.DateTimeFormatOptions = {
-    day: "numeric",
-    month: "short",
-    weekday: "short",
-  },
-) => new Date(d + "T12:00:00+05:30").toLocaleDateString("en-IN", options);
-export const timeLabel = (t: string) => {
-  const h = Number(t.slice(0, 2));
-  return `${h % 12 || 12}:${t.slice(3, 5)} ${h >= 12 ? "PM" : "AM"}`;
-};
+export { money, today, dateLabel, timeLabel } from "./format";

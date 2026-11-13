@@ -25,6 +25,9 @@ import {
   SlotDto,
   SlotPatchDto,
   GenerateDto,
+  VenueQueryDto,
+  DateQueryDto,
+  BookingQueryDto,
 } from "./dtos";
 import { UserGuard, UserRequest } from "./auth";
 import { today } from "./time";
@@ -37,7 +40,7 @@ export class PublicController {
   @Get("health") health() {
     return { status: "ok", timezone: "Asia/Kolkata" };
   }
-  @Get("venues") venues(@Query() q: any) {
+  @Get("venues") venues(@Query() q: VenueQueryDto) {
     return this.catalog.venues(q);
   }
   @Get("venue-filters") filters() {
@@ -48,9 +51,9 @@ export class PublicController {
   }
   @Get("venues/:id/slots") slots(
     @Param("id", ParseIntPipe) id: number,
-    @Query("date") date: string,
+    @Query() q: DateQueryDto,
   ) {
-    return this.catalog.slots(id, date || today());
+    return this.catalog.slots(id, q.date || today());
   }
   @Post("bookings") @UseGuards(UserGuard) book(
     @Body() b: BookingDto,
@@ -110,9 +113,9 @@ export class AdminController {
   }
   @Get("venues/:id/slots") slots(
     @Param("id", ParseIntPipe) id: number,
-    @Query("date") date: string,
+    @Query() q: DateQueryDto,
   ) {
-    return this.catalog.slots(id, date || today(), true);
+    return this.catalog.slots(id, q.date || today(), true);
   }
   @Post("venues/:id/slots") add(
     @Param("id", ParseIntPipe) id: number,
@@ -135,7 +138,7 @@ export class AdminController {
   @Delete("slots/:id") delete(@Param("id", ParseIntPipe) id: number) {
     return this.catalog.editSlot(id, {}, true);
   }
-  @Get("bookings") bookingsList(@Query() q: any) {
+  @Get("bookings") bookingsList(@Query() q: BookingQueryDto) {
     return this.bookings.list(q);
   }
 }

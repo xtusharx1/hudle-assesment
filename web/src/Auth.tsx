@@ -16,7 +16,7 @@ import {
 } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AuthTransition, AuthAction } from "./AuthTransition";
-import { api } from "./api";
+import { ApiError, api } from "./api";
 export interface User {
   id: number;
   name: string;
@@ -48,6 +48,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [transition, setTransition] = useState<AuthAction | null>(null);
   const busy = useRef(false);
   const client = useQueryClient();
+  const clearCustomerData = () => {
+    client.cancelQueries({
+      predicate: (q) =>
+        ["booking", "my-bookings"].includes(String(q.queryKey[0])),
+    });
+    client.removeQueries({
+      predicate: (q) =>
+        ["booking", "my-bookings"].includes(String(q.queryKey[0])),
+    });
+  };
+  const announce = () => {
+    try {
+      localStorage.setItem(
+        "hudle-account-change",
+        String(Date.now()) + Math.random(),
+      );
+    } catch {
+      /* Cookies still work if storage is unavailable. */
+    }
+  };
   useEffect(() => {
     let active = true;
     api<User>("/auth/me")
@@ -65,10 +85,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const expired = () => {
       setUser(null);
-      client.clear();
+      clearCustomerData();
     };
     window.addEventListener("hudle-session-expired", expired);
     return () => window.removeEventListener("hudle-session-expired", expired);
+  }, [client]);
+  useEffect(() => {
+    let active = true;
+    const sync = () =>
+      api<User>("/auth/me")
+        .then((u) => {
+          if (active) setUser(u);
+        })
+        .catch((e) => {
+          if (active && e instanceof ApiError && e.status === 401)
+            setUser(null);
+        });
+    const changed = (e: StorageEvent) => {
+      if (e.key === "hudle-account-change") {
+        clearCustomerData();
+        void sync();
+      }
+    };
+    window.addEventListener("storage", changed);
+    window.addEventListener("focus", sync);
+    return () => {
+      active = false;
+      window.removeEventListener("storage", changed);
+      window.removeEventListener("focus", sync);
+    };
   }, [client]);
   async function run<T>(
     action: AuthAction,
@@ -100,14 +145,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(body),
       }),
     );
-    client.clear();
+    clearCustomerData();
     setUser(u);
+    announce();
     return u;
   }
   async function logout() {
     await run("logout", () => api("/auth/logout", { method: "POST" }));
     setUser(null);
-    client.clear();
+    clearCustomerData();
+    announce();
   }
   return (
     <Context.Provider
@@ -115,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         setUser: (u) => {
-          client.clear();
+          clearCustomerData();
           setUser(u);
         },
         logout,

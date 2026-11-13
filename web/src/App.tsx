@@ -46,6 +46,10 @@ import {
 } from "./api";
 import { AuthPage, RequireUser, useAuth } from "./Auth";
 import { ProfileMenu, ProfilePage } from "./Account";
+import { bookingDate } from "./format";
+import { useNow } from "./useNow";
+import { Dialog } from "./Dialog";
+import { VenueImage } from "./VenueImage";
 import Admin from "./Admin";
 import { Status } from "./Status";
 import { BookingPending } from "./BookingPending";
@@ -81,20 +85,51 @@ function RouteScroll() {
 export default function App() {
   const location = useLocation();
   const [menu, setMenu] = useState(false);
+  useEffect(() => setMenu(false), [location.pathname]);
+  useEffect(() => {
+    if (!menu) return;
+    document.querySelector<HTMLElement>("#main-navigation a")?.focus();
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenu(false);
+        document.querySelector<HTMLButtonElement>(".mobile-menu")?.focus();
+      }
+    };
+    const outside = (e: PointerEvent) => {
+      if (!(e.target as Element).closest("#main-navigation,.mobile-menu"))
+        setMenu(false);
+    };
+    document.addEventListener("keydown", close);
+    document.addEventListener("pointerdown", outside);
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.removeEventListener("pointerdown", outside);
+    };
+  }, [menu]);
   return (
     <>
       <RouteScroll />
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <header className="header">
         <Link to="/" className="logo" aria-label="Hudle home">
           HUDLE<span>↗</span>
         </Link>
-        <nav className={menu ? "nav open" : "nav"}>
+        <nav id="main-navigation" className={menu ? "nav open" : "nav"}>
           <NavLink to="/" end onClick={() => setMenu(false)}>
             Discover venues
           </NavLink>
           <NavLink to="/my-bookings" onClick={() => setMenu(false)}>
             My bookings
           </NavLink>
+          <Link
+            className="mobile-partner-link"
+            to="/admin"
+            onClick={() => setMenu(false)}
+          >
+            Venue partners
+          </Link>
         </nav>
         <div className="header-right">
           <ProfileMenu />
@@ -106,6 +141,8 @@ export default function App() {
           </Link>
           <button
             className="mobile-menu icon-btn"
+            aria-expanded={menu}
+            aria-controls="main-navigation"
             aria-label="Toggle navigation"
             onClick={() => setMenu(!menu)}
           >
@@ -113,7 +150,12 @@ export default function App() {
           </button>
         </div>
       </header>
-      <div className="route-transition" key={location.pathname}>
+      <div
+        id="main-content"
+        tabIndex={-1}
+        className="route-transition"
+        key={location.pathname}
+      >
         <Routes>
           <Route path="/" element={<Discover />} />
           <Route path="/venues/:id" element={<VenueDetails />} />
@@ -170,16 +212,41 @@ export default function App() {
   );
 }
 function Discover() {
-  const [sport, setSport] = useState("All sports");
-  const [q, setQ] = useState("");
-  const [search, setSearch] = useState("");
-  const [location, setLocation] = useState("");
+  const [params, setParams] = useSearchParams();
+  const sport = params.get("sport") || "All sports";
+  const search = params.get("q") || "";
+  const location = params.get("location") || "";
+  const sort = ["price", "rating"].includes(params.get("sort") || "")
+    ? params.get("sort")!
+    : "recommended";
+  const [q, setQ] = useState(search);
   const [filters, setFilters] = useState(false);
-  const [sort, setSort] = useState("recommended");
+  useEffect(() => setQ(search), [search]);
+  function updateFilter(key: string, value: string) {
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (!value || value === "All sports" || value === "recommended")
+          next.delete(key);
+        else next.set(key, value);
+        return next;
+      },
+      { replace: true },
+    );
+  }
+  const setSport = (value: string) => updateFilter("sport", value);
+  const setLocation = (value: string) => updateFilter("location", value);
+  const setSort = (value: string) => updateFilter("sort", value);
+  const setSearch = (value: string) => updateFilter("q", value);
+  const clearFilters = () => {
+    setParams({}, { replace: true });
+    setQ("");
+  };
   const {
     data: venues,
     error,
     isPending,
+    refetch,
   } = useQuery({
     queryKey: ["venues", sport, search, location],
     queryFn: () =>
@@ -231,7 +298,7 @@ function Discover() {
             className="brand-search"
             onSubmit={(e) => {
               e.preventDefault();
-              setSearch(q);
+              setSearch(q.trim());
               document
                 .getElementById("venues")
                 ?.scrollIntoView({ behavior: "smooth" });
@@ -242,8 +309,8 @@ function Discover() {
               <div>
                 <Search size={18} />
                 <input
-                  aria-label="Search venues or neighbourhoods"
-                  placeholder="Venue or neighbourhood"
+                  aria-label="Search venues, sports or neighbourhoods"
+                  placeholder="Venue, sport or neighbourhood"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                 />
@@ -360,15 +427,7 @@ function Discover() {
                 ))}
               </select>
             </label>
-            <button
-              className="text-btn"
-              onClick={() => {
-                setLocation("");
-                setSport("All sports");
-                setSearch("");
-                setQ("");
-              }}
-            >
+            <button className="text-btn" onClick={clearFilters}>
               Reset filters
             </button>
           </div>
@@ -405,21 +464,13 @@ function Discover() {
             </select>
           </label>
         </div>
-        <Status error={error} loading={isPending} />
+        <Status error={error} loading={isPending} retry={() => refetch()} />
         {venues?.length === 0 && (
           <div className="empty">
             <Search size={36} />
             <h3>No courts on this side of town.</h3>
             <p>Try another sport or clear your filters.</p>
-            <button
-              className="btn"
-              onClick={() => {
-                setSport("All sports");
-                setLocation("");
-                setSearch("");
-                setQ("");
-              }}
-            >
+            <button className="btn" onClick={clearFilters}>
               Explore all venues
             </button>
           </div>
@@ -478,16 +529,21 @@ function VenueCard({ venue: v, index }: { venue: Venue; index: number }) {
     } catch {
       a = [];
     }
-    localStorage.setItem(
-      "hudle-favourites",
-      JSON.stringify(liked ? a.filter((id) => id !== v.id) : [...a, v.id]),
-    );
+    if (!Array.isArray(a)) a = [];
+    try {
+      localStorage.setItem(
+        "hudle-favourites",
+        JSON.stringify(liked ? a.filter((id) => id !== v.id) : [...a, v.id]),
+      );
+    } catch {
+      setLiked(liked);
+    }
   }
   return (
     <article className="venue-card">
       <div className="card-photo">
         <Link to={"/venues/" + v.id} tabIndex={-1}>
-          <img
+          <VenueImage
             src={v.image_url}
             alt={`${v.sport} court at ${v.name}`}
             loading="lazy"
@@ -541,25 +597,16 @@ function VenueDetails() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const requestedDate = params.get("date");
-  const initialDate =
-    requestedDate &&
-    /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) &&
-    requestedDate >= today()
-      ? requestedDate
-      : today();
+  const initialDate = bookingDate(requestedDate);
   const restoredSlot = useRef(false);
   const [date, setDate] = useState(initialDate);
   const [dateWasChosen, setDateWasChosen] = useState(false);
-  const [clock, setClock] = useState(Date.now);
+  const clock = useNow();
   useEffect(() => {
     setDate(initialDate);
-    setDateWasChosen(Boolean(requestedDate));
+    setDateWasChosen(requestedDate === initialDate);
     restoredSlot.current = false;
   }, [id]);
-  useEffect(() => {
-    const timer = window.setInterval(() => setClock(Date.now()), 15000);
-    return () => window.clearInterval(timer);
-  }, []);
   const [selected, setSelected] = useState<Slot | null>(null);
   const {
     data: v,
@@ -594,6 +641,15 @@ function VenueDetails() {
       restoredSlot.current = true;
     }
   }, [slots.data, params]);
+  const availableSelected =
+    (selected &&
+      slots.data?.find(
+        (s) =>
+          s.id === selected.id &&
+          s.availability === "AVAILABLE" &&
+          new Date(`${s.date}T${s.start_time}+05:30`).getTime() > clock,
+      )) ||
+    null;
   const amenities = v
     ? (typeof v.amenities === "string"
         ? JSON.parse(v.amenities)
@@ -626,7 +682,7 @@ function VenueDetails() {
             </span>
           </div>
           <div className="detail-photo">
-            <img src={v.image_url} alt={v.name} />
+            <VenueImage src={v.image_url} alt={v.name} />
             <span className="photo-chip">
               <ShieldCheck size={15} /> Your next favourite place to play
             </span>
@@ -661,6 +717,7 @@ function VenueDetails() {
                   {dates.map((d, i) => (
                     <button
                       key={d}
+                      aria-pressed={d === date}
                       className={
                         "date-button " + (d === date ? "selected" : "")
                       }
@@ -691,14 +748,20 @@ function VenueDetails() {
                     Unavailable
                   </span>
                 </div>
-                <Status loading={slots.isPending} error={slots.error} />
+                <Status
+                  loading={slots.isPending}
+                  error={slots.error}
+                  retry={() => slots.refetch()}
+                />
                 <div className="slots-grid content-transition" key={date}>
                   {slots.data?.map((s) => (
                     <button
                       key={s.id}
+                      aria-pressed={s.id === availableSelected?.id}
                       disabled={s.availability !== "AVAILABLE"}
                       className={
-                        "slot " + (s.id === selected?.id ? "selected" : "")
+                        "slot " +
+                        (s.id === availableSelected?.id ? "selected" : "")
                       }
                       onClick={() => setSelected(s)}
                     >
@@ -732,7 +795,7 @@ function VenueDetails() {
             <aside className="booking-sidebar">
               <BookingForm
                 venue={v}
-                slot={selected}
+                slot={availableSelected}
                 date={date}
                 onConflict={() => {
                   setSelected(null);
@@ -775,6 +838,7 @@ function BookingForm({
       method: "POST",
       body: JSON.stringify({
         slotId: slot.id,
+        expectedPrice: slot.price,
       }),
     });
     try {
@@ -880,10 +944,18 @@ function Confirmation() {
       <Status error={error} loading={isPending} />
       {b && (
         <>
-          <span className="success-circle">
-            <Check size={34} />
+          <span
+            className={
+              "success-circle" + (b.status === "CANCELLED" ? " cancelled" : "")
+            }
+          >
+            {b.status === "CANCELLED" ? <X size={34} /> : <Check size={34} />}
           </span>
-          <span className="eyebrow green">IT'S OFFICIAL. YOU'RE PLAYING.</span>
+          <span className="eyebrow green">
+            {b.status === "CANCELLED"
+              ? "YOUR CANCELLATION IS CONFIRMED"
+              : "IT'S OFFICIAL. YOU'RE PLAYING."}
+          </span>
           <h1>
             {b.status === "CANCELLED"
               ? "Booking cancelled."
@@ -951,8 +1023,10 @@ function Confirmation() {
 }
 function MyBookings() {
   const { user } = useAuth();
+  const now = useNow();
   const [tab, setTab] = useState("upcoming");
   const query = useQuery({
+    refetchInterval: 15000,
     queryKey: ["my-bookings", user?.id],
     queryFn: async () => ({
       bookings: await api<Booking[]>("/bookings"),
@@ -975,7 +1049,7 @@ function MyBookings() {
   });
   const isUpcoming = (b: Booking) =>
     b.status === "CONFIRMED" &&
-    new Date(`${b.date}T${b.start_time}+05:30`).getTime() > Date.now();
+    new Date(`${b.date}T${b.start_time}+05:30`).getTime() > now;
   const bookings = query.data?.bookings
     .filter((b) => (tab === "upcoming" ? isUpcoming(b) : !isUpcoming(b)))
     .sort((a, b) =>
@@ -986,8 +1060,9 @@ function MyBookings() {
       <span className="eyebrow green">GOOD PLANS, ALL IN ONE PLACE</span>
       <h1>Your next move.</h1>
       <p>Your courts, your crew, your calendar.</p>
-      <div className="tabs">
+      <div className="tabs" role="group" aria-label="Booking view">
         <button
+          aria-pressed={tab === "upcoming"}
           className={tab === "upcoming" ? "active" : ""}
           onClick={() => setTab("upcoming")}
         >
@@ -995,6 +1070,7 @@ function MyBookings() {
           <span>{query.data?.bookings.filter(isUpcoming).length || 0}</span>
         </button>
         <button
+          aria-pressed={tab === "past"}
           className={tab === "past" ? "active" : ""}
           onClick={() => setTab("past")}
         >
@@ -1002,7 +1078,11 @@ function MyBookings() {
         </button>
       </div>
       <div className="content-transition" key={tab}>
-        <Status loading={query.isPending} error={query.error} />
+        <Status
+          loading={query.isPending}
+          error={query.error}
+          retry={() => query.refetch()}
+        />
         {!!query.data?.failed && (
           <div className="notice">
             Some bookings could not be loaded. Refresh to try again.
@@ -1029,7 +1109,7 @@ function MyBookings() {
         <div className="bookings-list">
           {bookings?.map((b) => (
             <article className="booking-card" key={b.reference}>
-              <img src={b.image_url} alt={b.venue_name} />
+              <VenueImage src={b.image_url} alt={b.venue_name} />
               <div>
                 <span
                   className={
@@ -1070,8 +1150,12 @@ function MyBookings() {
                     Cancel booking
                   </button>
                 ) : (
-                  <Link to={"/venues/" + b.venue_id} className="text-btn">
-                    Play again <ArrowUpRight size={15} />
+                  <Link
+                    to={b.venue_is_active ? "/venues/" + b.venue_id : "/"}
+                    className="text-btn"
+                  >
+                    {b.venue_is_active ? "Play again" : "Find another venue"}{" "}
+                    <ArrowUpRight size={15} />
                   </Link>
                 )}
               </div>
@@ -1084,50 +1168,38 @@ function MyBookings() {
         your games.
       </p>
       {cancel && (
-        <div
-          className="modal-backdrop"
-          onClick={() => !mutation.isPending && setCancel(null)}
+        <Dialog
+          title="Change of plans?"
+          close={() => setCancel(null)}
+          busy={mutation.isPending}
         >
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cancel-title"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <CalendarDays size={30} />
+          <p>
+            Cancel your game at {cancel.venue_name} on {dateLabel(cancel.date)}?
+            Your slot will be released for someone else.
+          </p>
+          {mutation.error && (
+            <div className="notice error" role="alert">
+              {mutation.error.message}
+            </div>
+          )}
+          <div className="modal-actions">
             <button
-              className="modal-close icon-btn"
-              aria-label="Close"
+              className="btn secondary"
+              disabled={mutation.isPending}
               onClick={() => setCancel(null)}
             >
-              <X />
+              Keep my game
             </button>
-            <CalendarDays size={30} />
-            <h2 id="cancel-title">Change of plans?</h2>
-            <p>
-              Cancel your game at {cancel.venue_name} on{" "}
-              {dateLabel(cancel.date)}? Your slot will be released for someone
-              else.
-            </p>
-            {mutation.error && (
-              <div className="notice error" role="alert">
-                {mutation.error.message}
-              </div>
-            )}
-            <div className="modal-actions">
-              <button className="btn secondary" onClick={() => setCancel(null)}>
-                Keep my game
-              </button>
-              <button
-                className="btn"
-                disabled={mutation.isPending}
-                onClick={() => mutation.mutate(cancel)}
-              >
-                {mutation.isPending ? "Cancelling…" : "Cancel booking"}
-              </button>
-            </div>
-          </section>
-        </div>
+            <button
+              className="btn"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate(cancel)}
+            >
+              {mutation.isPending ? "Cancelling…" : "Cancel booking"}
+            </button>
+          </div>
+        </Dialog>
       )}
     </main>
   );

@@ -25,6 +25,12 @@ export function AuthTransition({ action }: { action: AuthAction }) {
       aria-labelledby="auth-transition-title"
       aria-describedby="auth-transition-message"
       onCancel={(e) => e.preventDefault()}
+      onKeyDown={(e) => {
+        if (e.key === "Tab") {
+          e.preventDefault();
+          dialog.current?.focus();
+        }
+      }}
     >
       <div className="auth-orbit" aria-hidden="true">
         <span />

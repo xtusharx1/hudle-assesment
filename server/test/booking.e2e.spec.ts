@@ -393,3 +393,201 @@ it("rejects forged JWTs, expired access tokens, foreign origins, and weak passwo
     .send({ slotId: slot, name: "Spoofed Owner" })
     .expect(400);
 });
+
+it("finds venues by sport keywords as well as venue names", async () => {
+  const response = await request(app.getHttpServer())
+    .get("/api/venues?q=Tennis")
+    .expect(200);
+  expect(response.body.some((v: any) => v.id === venue)).toBe(true);
+});
+it("rejects whitespace-only venue details after normalization", async () => {
+  await request(app.getHttpServer())
+    .post("/api/admin/venues")
+    .set("Authorization", "Bearer " + admin)
+    .send({
+      name: "   ",
+      sport: "Tennis",
+      location: "  ",
+      address: "      ",
+      price_per_hour: 50000,
+    })
+    .expect(400);
+});
+it("rejects malformed photo URLs and repeated query parameters", async () => {
+  await request(app.getHttpServer())
+    .post("/api/admin/venues")
+    .set("Authorization", "Bearer " + admin)
+    .send({
+      name: "Invalid image",
+      sport: "Tennis",
+      location: "Delhi",
+      address: "Test Street",
+      price_per_hour: 50000,
+      image_url: "https://",
+    })
+    .expect(400);
+  await request(app.getHttpServer())
+    .get("/api/venues?sport=Tennis&sport=Football")
+    .expect(400);
+  await request(app.getHttpServer())
+    .get(`/api/venues/${venue}/slots?date=${date}&date=${date}`)
+    .expect(400);
+});
+it("rejects impossible dates and out-of-order or overlong slot generation", async () => {
+  const auth = "Bearer " + admin;
+  await request(app.getHttpServer())
+    .get(`/api/venues/${venue}/slots?date=2026-02-30`)
+    .expect(400);
+  await request(app.getHttpServer())
+    .post(`/api/admin/venues/${venue}/slots`)
+    .set("Authorization", auth)
+    .send({ date, start_time: "11:00", end_time: "10:00", price: 50000 })
+    .expect(400);
+  await request(app.getHttpServer())
+    .post(`/api/admin/venues/${venue}/slots/generate`)
+    .set("Authorization", auth)
+    .send({
+      from: date,
+      to: "2099-01-01",
+      opens: "09:00",
+      closes: "12:00",
+      duration: 60,
+    })
+    .expect(400);
+});
+it("keeps cancellation idempotent and booking data private from public slots", async () => {
+  const b = (await book()).body;
+  const slots = await request(app.getHttpServer())
+    .get(`/api/venues/${venue}/slots?date=${date}`)
+    .expect(200);
+  expect(slots.body[0].booking_reference).toBeUndefined();
+  await player.post(`/api/bookings/${b.reference}/cancel`).expect(200);
+  await player.post(`/api/bookings/${b.reference}/cancel`).expect(200);
+});
+it("refuses a stale price quote without creating a booking", async () => {
+  await player
+    .post("/api/bookings")
+    .send({ slotId: slot, expectedPrice: 49999 })
+    .expect(409);
+  const [{ total }] = await db.query(
+    "SELECT COUNT(*) total FROM bookings WHERE slot_id=?",
+    [slot],
+  );
+  expect(Number(total)).toBe(0);
+  await player
+    .post("/api/bookings")
+    .send({ slotId: slot, expectedPrice: 50000 })
+    .expect(201);
+});
+it("validates admin booking filters and protected mutations", async () => {
+  await request(app.getHttpServer())
+    .get("/api/admin/bookings?status=INVALID")
+    .set("Authorization", "Bearer " + admin)
+    .expect(400);
+  await request(app.getHttpServer())
+    .get("/api/admin/bookings?venueId=abc")
+    .set("Authorization", "Bearer " + admin)
+    .expect(400);
+  await request(app.getHttpServer())
+    .patch(`/api/admin/slots/${slot}`)
+    .send({ price: 1 })
+    .expect(401);
+});
+it("supports independent sessions and expires a session at its absolute deadline", async () => {
+  // Create the session directly in this isolated test DB to keep rate-limit counters independent.
+  const { randomUUID, randomBytes } = await import("crypto");
+  const { hash } = await import("../src/common");
+  const { JwtService } = await import("@nestjs/jwt");
+  const [u] = await db.query("SELECT id FROM users WHERE email=?", [
+    "player@example.com",
+  ]);
+  const sid = randomUUID(),
+    refresh = randomBytes(32).toString("base64url");
+  await db.query(
+    "INSERT INTO auth_sessions(id,user_id,refresh_hash,expires_at) VALUES(?,?,?,DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 DAY))",
+    [sid, u.id, hash(refresh)],
+  );
+  const access = app
+    .get(JwtService)
+    .sign(
+      { role: "customer", sub: String(u.id), sid },
+      { expiresIn: "15m", issuer: "hudle-api", audience: "hudle-customer" },
+    );
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", "hudle_access=" + access)
+    .expect(200);
+  await db.query(
+    "UPDATE auth_sessions SET expires_at=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 1 DAY) WHERE id=?",
+    [sid],
+  );
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", "hudle_access=" + access)
+    .expect(401);
+  await request(app.getHttpServer())
+    .post("/api/auth/refresh")
+    .set("Cookie", "hudle_refresh=" + refresh)
+    .expect(401);
+  await player.get("/api/auth/me").expect(200);
+});
+it("revokes the access session on logout even if the refresh cookie is missing", async () => {
+  const { randomUUID, randomBytes } = await import("crypto");
+  const { hash } = await import("../src/common");
+  const { JwtService } = await import("@nestjs/jwt");
+  const [u] = await db.query("SELECT id FROM users WHERE email=?", [
+    "player@example.com",
+  ]);
+  const sid = randomUUID();
+  await db.query(
+    "INSERT INTO auth_sessions(id,user_id,refresh_hash,expires_at) VALUES(?,?,?,DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 DAY))",
+    [sid, u.id, hash(randomBytes(32).toString("hex"))],
+  );
+  const access = app
+    .get(JwtService)
+    .sign(
+      { role: "customer", sub: String(u.id), sid },
+      { expiresIn: "15m", issuer: "hudle-api", audience: "hudle-customer" },
+    );
+  await request(app.getHttpServer())
+    .post("/api/auth/logout")
+    .set("Cookie", "hudle_access=" + access)
+    .expect(200);
+  await request(app.getHttpServer())
+    .get("/api/auth/me")
+    .set("Cookie", "hudle_access=" + access)
+    .expect(401);
+});
+it("treats wildcard-looking search text literally and rejects expired admin JWTs", async () => {
+  const response = await request(app.getHttpServer())
+    .get("/api/venues?q=%25")
+    .expect(200);
+  expect(response.body).toEqual([]);
+  const { JwtService } = await import("@nestjs/jwt");
+  const expired = app
+    .get(JwtService)
+    .sign({ role: "admin" }, { expiresIn: -1 });
+  await request(app.getHttpServer())
+    .get("/api/admin/venues")
+    .set("Authorization", "Bearer " + expired)
+    .expect(401);
+});
+it("preserves owner access and cancellation after venue deactivation", async () => {
+  const b = (await book()).body;
+  await request(app.getHttpServer())
+    .delete(`/api/admin/venues/${venue}`)
+    .set("Authorization", "Bearer " + admin)
+    .expect(200);
+  await request(app.getHttpServer()).get(`/api/venues/${venue}`).expect(404);
+  const history = await player.get(`/api/bookings/${b.reference}`).expect(200);
+  expect(history.body.venue_is_active).toBe(0);
+  await player.post(`/api/bookings/${b.reference}/cancel`).expect(200);
+});
+it("deletes an unbooked slot without leaving an availability record", async () => {
+  await request(app.getHttpServer())
+    .delete(`/api/admin/slots/${slot}`)
+    .set("Authorization", "Bearer " + admin)
+    .expect(200);
+  const rows = await db.query("SELECT id FROM slots WHERE id=?", [slot]);
+  expect(rows).toEqual([]);
+});

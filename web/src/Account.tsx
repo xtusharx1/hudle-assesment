@@ -16,6 +16,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "./Auth";
+import { useNow } from "./useNow";
 import { api, Booking } from "./api";
 export function ProfileMenu() {
   const { user, loading, logout } = useAuth();
@@ -205,8 +206,10 @@ export function ProfileMenu() {
   );
 }
 export function ProfilePage() {
+  const now = useNow();
   const { user } = useAuth();
   const query = useQuery({
+    refetchInterval: 15000,
     queryKey: ["my-bookings", user?.id],
     queryFn: async () => ({
       bookings: await api<Booking[]>("/bookings"),
@@ -217,7 +220,7 @@ export function ProfilePage() {
   const upcoming = bookings?.filter(
     (b) =>
       b.status === "CONFIRMED" &&
-      new Date(`${b.date}T${b.start_time}+05:30`).getTime() > Date.now(),
+      new Date(`${b.date}T${b.start_time}+05:30`).getTime() > now,
   ).length;
   return (
     <main className="page profile-page">

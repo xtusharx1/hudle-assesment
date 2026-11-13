@@ -188,3 +188,9 @@ The visual direction was reviewed against [Hudle's official website](https://www
 Venue details automatically selects tomorrow once every scheduled slot start for today has passed (IST). It checks every 15 seconds while open. Explicit date selections remain under the user's control. Run `npm run test -w web` for the six date-selection checks, including 11:55 PM and year rollover.
 
 The header profile icon opens four account cards. Signed-in users can open `/profile` to view their stored details and live booking totals. Customer and partner login/logout, customer registration, page navigation, booking tabs, discovery filters and slot-date changes include short transitions. Reduced-motion settings disable decorative motion; the UI waits for actual API success before showing an authenticated result.
+
+## QA audit
+
+The [complete end-to-end QA report](docs/QA_AUDIT.md) records 26 fixed findings, their reproduction evidence and retests, plus remaining production limits. Verification includes 29 MySQL-backed API tests, 12 frontend tests, two-tab booking/cancellation flows, native Chrome date controls, and mobile smoke checks across the full catalogue. No claim of exhaustive bug-freedom is made.
+
+Booking clients may send `{ slotId, expectedPrice }`; `expectedPrice` is an integer amount in paise. A stale quote returns 409 before a booking is inserted. Amounts with paise are displayed exactly. Customer session changes retain public discovery queries and synchronize account state across tabs. Shared native dialogs support Escape and keyboard focus containment.

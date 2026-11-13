@@ -8,7 +8,7 @@ import { db } from "./database/source";
 import { User } from "./auth";
 import { startsAt } from "./time";
 import { BookingDto } from "./dtos";
-const select = `SELECT b.reference,b.customer_name,b.customer_phone,b.customer_email,b.status,b.amount,b.created_at,b.cancelled_at,s.id slot_id,s.date,s.start_time,s.end_time,v.id venue_id,v.name venue_name,v.sport,v.location,v.address,v.image_url FROM bookings b JOIN slots s ON s.id=b.slot_id JOIN venues v ON v.id=s.venue_id`;
+const select = `SELECT b.reference,b.customer_name,b.customer_phone,b.customer_email,b.status,b.amount,b.created_at,b.cancelled_at,s.id slot_id,s.date,s.start_time,s.end_time,v.id venue_id,v.is_active venue_is_active,v.name venue_name,v.sport,v.location,v.address,v.image_url FROM bookings b JOIN slots s ON s.id=b.slot_id JOIN venues v ON v.id=s.venue_id`;
 @Injectable()
 export class BookingsService {
   async create(b: BookingDto, user: User) {
@@ -32,6 +32,10 @@ export class BookingsService {
           throw new NotFoundException("Venue or slot is unavailable");
         if (s.is_blocked || startsAt(s.date, s.start_time) <= Date.now())
           throw new ConflictException("This slot is no longer available");
+        if (b.expectedPrice !== undefined && b.expectedPrice !== s.price)
+          throw new ConflictException(
+            "The slot price has changed. Please review the updated price and try again.",
+          );
         const active = await m.query(
           "SELECT id FROM bookings WHERE active_slot_id=? FOR UPDATE",
           [s.id],

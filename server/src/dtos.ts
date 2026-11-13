@@ -9,10 +9,13 @@ import {
   Length,
   IsBoolean,
   IsIn,
+  ValidateBy,
+  IsDateString,
 } from "class-validator";
 import { Transform } from "class-transformer";
 export class BookingDto {
   @IsInt() @Min(1) slotId!: number;
+  @IsOptional() @IsInt() @Min(0) @Max(10000000) expectedPrice?: number;
 }
 export class RegisterDto {
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
@@ -44,7 +47,10 @@ export class LoginDto {
   @IsString() @Length(1, 200) password!: string;
 }
 export class VenueDto {
-  @IsString() @Length(2, 150) name!: string;
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @Length(2, 150)
+  name!: string;
   @IsIn([
     "Badminton",
     "Football",
@@ -56,11 +62,38 @@ export class VenueDto {
     "Pickleball",
   ])
   sport!: string;
-  @IsString() @Length(2, 100) location!: string;
-  @IsString() @Length(5, 300) address!: string;
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @Length(2, 100)
+  location!: string;
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @Length(5, 300)
+  address!: string;
   @IsOptional() @IsString() @Length(0, 3000) description?: string;
   @IsOptional()
-  @Matches(/^(https:\/\/|\/images\/[a-z]+\.jpg$)/)
+  @ValidateBy({
+    name: "imageUrl",
+    validator: {
+      validate(value: unknown) {
+        if (typeof value !== "string") return false;
+        if (/^\/images\/[a-z]+\.jpg$/.test(value)) return true;
+        try {
+          const url = new URL(value);
+          return (
+            url.protocol === "https:" &&
+            Boolean(url.hostname) &&
+            !url.username &&
+            !url.password
+          );
+        } catch {
+          return false;
+        }
+      },
+      defaultMessage: () =>
+        "image_url must be a valid HTTPS URL or a bundled image path",
+    },
+  })
   @Length(0, 1000)
   image_url?: string;
   @IsInt() @Min(0) @Max(10000000) price_per_hour!: number;
@@ -81,4 +114,42 @@ export class GenerateDto {
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) opens!: string;
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) closes!: string;
   @IsInt() @Min(30) @Max(240) duration!: number;
+}
+
+export class VenueQueryDto {
+  @IsOptional() @IsString() @Length(0, 40) sport?: string;
+  @IsOptional() @IsString() @Length(0, 100) location?: string;
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @Length(0, 100)
+  q?: string;
+}
+export class DateQueryDto {
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  date?: string;
+}
+export class BookingQueryDto {
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === ""
+      ? undefined
+      : typeof value === "string"
+        ? Number(value)
+        : value,
+  )
+  @IsInt()
+  @Min(1)
+  venueId?: number;
+  @IsOptional()
+  @Transform(({ value }) => (value === "" ? undefined : value))
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  date?: string;
+  @IsOptional()
+  @Transform(({ value }) => (value === "" ? undefined : value))
+  @IsIn(["CONFIRMED", "CANCELLED"])
+  status?: string;
 }

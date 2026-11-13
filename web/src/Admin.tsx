@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Link,
@@ -34,10 +34,20 @@ import {
   dateLabel,
 } from "./api";
 import { AuthTransition } from "./AuthTransition";
+import { VenueImage } from "./VenueImage";
+import { Dialog } from "./Dialog";
 import { Status } from "./Status";
 export default function Admin() {
   const [signed, setSigned] = useState(!!sessionStorage.getItem("hudle-admin"));
   const navigate = useNavigate();
+  useEffect(() => {
+    const expired = () => {
+      setSigned(false);
+      navigate("/admin/login", { replace: true });
+    };
+    window.addEventListener("hudle-admin-expired", expired);
+    return () => window.removeEventListener("hudle-admin-expired", expired);
+  }, [navigate]);
   const [leaving, setLeaving] = useState(false);
   if (!signed) return <Login done={() => setSigned(true)} />;
   return (
@@ -184,7 +194,11 @@ function Venues() {
           Add venue
         </button>
       </div>
-      <Status loading={query.isPending} error={query.error} />
+      <Status
+        loading={query.isPending}
+        error={query.error}
+        retry={() => query.refetch()}
+      />
       <div className="table-wrap">
         <table>
           <thead>
@@ -201,7 +215,7 @@ function Venues() {
               <tr key={v.id}>
                 <td>
                   <div className="table-venue">
-                    <img src={v.image_url} alt="" />
+                    <VenueImage src={v.image_url} alt="" />
                     <div>
                       <strong>{v.name}</strong>
                       <small>{v.location}</small>
@@ -259,6 +273,7 @@ function Venues() {
       )}
       {deactivate && (
         <Modal
+          busy={mutation.isPending}
           title="Take this venue off sale?"
           close={() => setDeactivate(null)}
         >
@@ -285,33 +300,20 @@ function Modal({
   title,
   close,
   children,
+  busy = false,
 }: {
   title: string;
   close: () => void;
+  busy?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="modal-backdrop" onClick={close}>
-      <section
-        className="modal wide"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          className="icon-btn modal-close"
-          aria-label="Close"
-          onClick={close}
-        >
-          <X />
-        </button>
-        <h2>{title}</h2>
-        {children}
-      </section>
-    </div>
+    <Dialog title={title} close={close} busy={busy} wide>
+      {children}
+    </Dialog>
   );
 }
+
 function VenueForm({
   venue: v,
   close,
@@ -343,7 +345,11 @@ function VenueForm({
     });
   }
   return (
-    <Modal title={v ? "Edit venue" : "A new place to play."} close={close}>
+    <Modal
+      title={v ? "Edit venue" : "A new place to play."}
+      close={close}
+      busy={mutation.isPending}
+    >
       <form onSubmit={submit} className="form-grid">
         <label>
           Venue name
@@ -491,7 +497,8 @@ function Slots() {
         `/venues/${id}/slots${path}`,
         { method: "POST", body: JSON.stringify(body) },
       ),
-    onSuccess: (r) => {
+    onSuccess: (r, variables) => {
+      setDate(variables.body.from || variables.body.date);
       setForm(null);
       invalidate();
       setMessage(
@@ -565,7 +572,11 @@ function Slots() {
           {message}
         </div>
       )}
-      <Status loading={query.isPending} error={query.error} />
+      <Status
+        loading={query.isPending}
+        error={query.error}
+        retry={() => query.refetch()}
+      />
       {mutation.error && !removing && !repricing && (
         <div role="alert" className="notice error">
           {mutation.error.message}
@@ -653,6 +664,7 @@ function Slots() {
       </div>
       {form && (
         <Modal
+          busy={generate.isPending}
           title={form === "bulk" ? "Fill the calendar." : "Add a playtime."}
           close={() => setForm(null)}
         >
@@ -761,7 +773,11 @@ function Slots() {
         </Modal>
       )}
       {removing && (
-        <Modal title="Delete this slot?" close={() => setRemoving(null)}>
+        <Modal
+          busy={mutation.isPending}
+          title="Delete this slot?"
+          close={() => setRemoving(null)}
+        >
           <p>
             {dateLabel(date)} · {timeLabel(removing.start_time)}. Slots with
             booking history cannot be deleted.
@@ -779,7 +795,11 @@ function Slots() {
         </Modal>
       )}
       {repricing && (
-        <Modal title="Update slot price" close={() => setRepricing(null)}>
+        <Modal
+          busy={mutation.isPending}
+          title="Update slot price"
+          close={() => setRepricing(null)}
+        >
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -879,7 +899,11 @@ function Bookings() {
           Reset
         </button>
       </div>
-      <Status loading={query.isPending} error={query.error} />
+      <Status
+        loading={query.isPending}
+        error={query.error}
+        retry={() => query.refetch()}
+      />
       <div
         className="table-wrap content-transition"
         key={`${venueId}-${date}-${status}`}

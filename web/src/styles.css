@@ -3976,3 +3976,70 @@ footer {
     transform: none;
   }
 }
+
+/* QA: grid children must shrink before the date strip scrolls on narrow screens. */
+.detail-layout > section,
+.detail-layout > aside {
+  min-width: 0;
+}
+.nav > .mobile-partner-link {
+  display: none;
+}
+@media (max-width: 560px) {
+  .nav .mobile-partner-link {
+    display: block;
+  }
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .booking-sidebar {
+    width: 100%;
+  }
+  .description {
+    max-width: 100%;
+  }
+}
+.qa-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  border: 1px solid #e0e8e1;
+  box-sizing: border-box;
+  animation: profile-reveal 0.2s both;
+  max-width: calc(100vw - 32px);
+}
+.qa-dialog::backdrop {
+  background: #06262273;
+  backdrop-filter: blur(5px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .qa-dialog {
+    animation: none !important;
+  }
+}
+
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: -60px;
+  z-index: 2000;
+  padding: 12px 18px;
+  border-radius: 8px;
+  background: #fff;
+  color: #154d3a;
+  font-weight: 600;
+}
+.skip-link:focus {
+  top: 12px;
+  outline: 3px solid #16a28d;
+}
+#main-content:focus {
+  outline: none;
+}
+
+.success-circle.cancelled {
+  background: #faeee8;
+  color: #9d4f40;
+}

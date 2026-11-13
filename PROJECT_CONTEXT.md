@@ -104,3 +104,20 @@ Prefer completing assessment flows over adding infrastructure. Redis, Elasticsea
 `web/src/AuthTransition.tsx` provides the customer and partner login/logout modal animation, also used for customer registration. A native modal dialog makes the background inert and contains focus. Requests start immediately; the transition remains for at least 850ms, including failures, and longer while waiting for the server. Errors return to the form/menu. Customer actions have a synchronous concurrency guard. Logout clears UI identity only after API success.
 
 The top-level route wrapper animates when the pathname changes. Booking tabs (including empty states), discovery filters/sorting, slot dates and admin table filters animate their updated content; controls have short active/hover transitions. Motion uses CSS only. `prefers-reduced-motion` disables all new decorative animations and transitions. The existing minimum two-second booking animation remains separate.
+
+## QA audit and regressions (14 November 2026)
+
+See `docs/QA_AUDIT.md` for the complete 26-item defect log, reproduction evidence, retests, and explicit remaining release limits. The regression suite now contains 29 real-MySQL API tests and 12 frontend tests.
+
+Important changes from the audit:
+
+- Never clear public/admin queries when changing customer identity. Only cancel/remove account booking queries. Synchronize other tabs via token-free storage events and focus checks; modern browsers coordinate refresh using Web Locks.
+- Booking clients send `expectedPrice` in paise; reject a changed quote inside the slot lock with 409. Resolve selected slots from current availability. Booking responses include `venue_is_active` so past history does not send users to inactive venues.
+- Query DTOs validate scalar filters and real dates. Venue text is trimmed before validation; photo URLs are parsed. Keyword search covers sports and escapes SQL wildcard characters as literals.
+- Revoke logout sessions through either refresh hash or verified access JWT session claim, including a missing refresh-cookie case.
+- `format.ts` handles exact paise and explicit IST dates; incoming booking links must fit the visible 14-day window. Frontend tests independently cover non-IST host timezones.
+- `Dialog.tsx` is the shared native modal with Escape, explicit focus wrapping, scroll lock and busy-state dismissal guards. Auth transitions also contain focus. Keep pending cancellation actions disabled.
+- Discovery committed filters/sort are stored in URL parameters so Back restores them. Mobile details require shrinking grid children (`min-width:0`); preserve this when changing layouts.
+- `http.ts` decodes error responses safely, including proxy HTML and null JSON. API fetches have a 20-second bound; queries expose retry actions. `VenueImage.tsx` provides a bundled photo fallback.
+
+The fictional QA venue was deactivated after testing; one cancelled QA booking and its user remain as audit history. Do not treat them as production customers or reset existing records to remove them.

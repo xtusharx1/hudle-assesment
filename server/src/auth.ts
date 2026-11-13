@@ -169,6 +169,23 @@ export class AuthService {
       await db.query("DELETE FROM auth_sessions WHERE refresh_hash=?", [
         hash(token),
       ]);
+    // Revoke by the signed session claim too: refresh cookies can be missing or stale.
+    let access: { role?: string; sid?: string; sub?: string } | undefined;
+    try {
+      access = this.jwt.verify(cookie(req, "hudle_access"), {
+        issuer: "hudle-api",
+        audience: "hudle-customer",
+        algorithms: ["HS256"],
+        ignoreExpiration: true,
+      });
+    } catch {
+      /* Logout remains idempotent for invalid cookies. */
+    }
+    if (access?.role === "customer" && access.sid && access.sub)
+      await db.query("DELETE FROM auth_sessions WHERE id=? AND user_id=?", [
+        access.sid,
+        access.sub,
+      ]);
     res.clearCookie("hudle_access", cookieOptions("/api"));
     res.clearCookie("hudle_refresh", cookieOptions("/api/auth"));
     res.setHeader("Cache-Control", "no-store");
