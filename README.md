@@ -116,7 +116,7 @@ Customers register with name, email, Indian mobile number and a password of at l
 
 Customer access JWTs last 15 minutes and use issuer/audience/role checks. Random refresh tokens rotate on each refresh; only SHA-256 hashes are stored in MySQL sessions. Sessions expire 30 days after login. Both cookies are HttpOnly and SameSite=Strict; HTTPS deployment uses Secure. JavaScript never stores customer tokens. The frontend refreshes an expired access token once and retries the request. Logout deletes the current session, immediately invalidating its access and refresh tokens. Other devices have independent sessions. Non-GET browser requests check the Origin allowlist, and authentication endpoints are rate limited.
 
-“My bookings” is loaded from MySQL for the account and works on another browser after sign-in. The migration preserves historical guest rows without attaching them to accounts by unverified email/phone; those rows remain admin-visible. Existing local-storage guest tokens no longer grant public access. Email/mobile verification and password recovery are future work.
+“My bookings” is loaded from MySQL for the account and works on another browser after sign-in. The migration preserves historical guest rows without attaching them to accounts by unverified email/phone; those rows remain admin-visible. Existing local-storage guest tokens no longer grant public access. Email/mobile verification and password recovery are outside the assessment scope.
 
 Admin JWTs expire after eight hours and are kept in session storage. Credentials come from the environment, with constant-time comparisons. Helmet, input allowlisting/validation, and a bounded process-local rate limiter are included. The limiter is suitable for this single-instance demo, not a distributed deployment. Production startup requires explicit `JWT_SECRET` and `ADMIN_PASSWORD`.
 
@@ -160,7 +160,7 @@ Admin:
 - `PATCH / DELETE /api/admin/slots/:id`
 - `GET /api/admin/bookings?venueId=&date=&status=`
 
-Admin endpoints require `Authorization: Bearer <JWT>`; customer endpoints use HttpOnly cookies. Errors use `{ error: { code, message } }`. Amounts in API requests/responses are paise; times are IST. Admin booking lists are capped at 500 records for this demo; production needs pagination.
+Admin endpoints require `Authorization: Bearer <JWT>`; customer endpoints use HttpOnly cookies. Errors use `{ error: { code, message } }`. Amounts in API requests/responses are paise; times are IST. Admin booking lists are capped at 500 records for this demo.
 
 ## Demo walkthrough
 
@@ -171,13 +171,9 @@ Admin endpoints require `Authorization: Bearer <JWT>`; customer endpoints use Ht
 5. Sign in to admin, edit a venue, generate slots, change a slot price, and view bookings.
 6. Run the concurrency test and explain both the slot lock and unique database constraint.
 
-## Tradeoffs and future work
+## Assessment scope
 
 One venue represents one bookable resource; separate courts require a resource entity and resource-level overlap rules. No payments, holds, notifications, email/mobile verification, password recovery, multi-slot booking, image uploads, or recurring opening-hours engine. Venue deactivation is intentionally one-way in this demo admin UI. The customer booking form stacks below slot selection on mobile rather than using a bottom sheet.
-
-Before production: email/mobile verification and password recovery, hardened admin authentication, secret rotation, HTTPS, backup/restore, pagination, shared rate limiting, observability, idempotency keys for safe POST retries, and bounded deadlock retry handling. Cache venue discovery only after measuring need; availability must always be validated against MySQL in the booking transaction. Add Redis or search infrastructure when traffic/search requirements justify them.
-
-Dependency audit at implementation time reported no high/critical runtime advisories and five moderate runtime findings through the TypeORM and React Router dependency trees. Review those advisories and their major-version upgrade paths before a production deployment; no forced major upgrades were applied during the assessment build.
 
 Additional illustrative photography: [swimming lanes by Markus Spiske](https://unsplash.com/photos/a-row-of-blue-and-white-striped-swimming-lanes-OAg9u5E1ju0) and [table tennis by Anshul Gurjar](https://unsplash.com/photos/blue-ping-pong-table-with-white-net-Nteb1TZR4Jo), via Unsplash.
 
@@ -188,9 +184,3 @@ The visual direction was reviewed against [Hudle's official website](https://www
 Venue details automatically selects tomorrow once every scheduled slot start for today has passed (IST). It checks every 15 seconds while open. Explicit date selections remain under the user's control. Run `npm run test -w web` for the six date-selection checks, including 11:55 PM and year rollover.
 
 The header profile icon opens four account cards. Signed-in users can open `/profile` to view their stored details and live booking totals. Customer and partner login/logout, customer registration, page navigation, booking tabs, discovery filters and slot-date changes include short transitions. Reduced-motion settings disable decorative motion; the UI waits for actual API success before showing an authenticated result.
-
-## QA audit
-
-The [complete end-to-end QA report](docs/QA_AUDIT.md) records 26 fixed findings, their reproduction evidence and retests, plus remaining production limits. Verification includes 29 MySQL-backed API tests, 12 frontend tests, two-tab booking/cancellation flows, native Chrome date controls, and mobile smoke checks across the full catalogue. No claim of exhaustive bug-freedom is made.
-
-Booking clients may send `{ slotId, expectedPrice }`; `expectedPrice` is an integer amount in paise. A stale quote returns 409 before a booking is inserted. Amounts with paise are displayed exactly. Customer session changes retain public discovery queries and synchronize account state across tabs. Shared native dialogs support Escape and keyboard focus containment.

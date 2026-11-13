@@ -163,6 +163,6 @@ docker compose up --build -d --wait
 | Temporary 502 after independently replacing API container | Restart web with `docker compose restart web` so Nginx resolves the replacement API         |
 | Fonts unavailable                                         | The browser falls back to sans-serif; booking data and bundled photos still work            |
 
-## Before external deployment
+## Optional demo deployment
 
-Use a hosted MySQL instance with backups; supply private environment values, HTTPS, a strong JWT secret and a changed admin password. Set `COOKIE_SECURE=true` and configure `WEB_ORIGIN` for the exact frontend origin. Host the API under the same site, preferably `/api` through a reverse proxy; SameSite=Strict cookies intentionally do not support unrelated frontend/API domains. Customer access JWTs expire after 15 minutes, with automatic refresh up to the session’s 30-day absolute expiry. Do not publish `.env` or database volumes. No cloud account or hosted deployment is included in this repository.
+For an HTTPS demo, set `COOKIE_SECURE=true`, provide a signing secret and admin credentials, and set `WEB_ORIGIN` to the frontend origin. Serve the API under the same site, preferably through the existing `/api` proxy. Customer access JWTs expire after 15 minutes and refresh sessions last up to 30 days. No cloud deployment is required to run or review the assignment.

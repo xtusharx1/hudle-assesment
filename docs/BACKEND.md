@@ -116,12 +116,12 @@ Migrations live in `src/database/schema.ts` `seed-batches.ts` and `user-accounts
 
 The integration suite boots NestJS against a separate real MySQL schema, exercises parallel requests, checks database occupancy, account isolation, JWT/session protection, cancellation/rebooking, slot management, validation, dynamic filters and seed batch idempotence. Run commands in [SETUP.md](SETUP.md).
 
-The current implementation intentionally omits payment collection, email/mobile verification and password recovery, pagination, shared rate limiting, idempotent creation keys, background scheduling and multiple resources per venue. See [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for handoff constraints.
+The assessment uses one bookable resource per venue. Payments, notifications and multi-slot bookings are outside its scope. See [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) for implementation context.
 
-## QA contract refinements
+## Request details
 
 `POST /bookings` additionally accepts optional `expectedPrice` (integer paise). The web client always supplies it; the transaction compares it to the locked slot price and returns 409 before insertion if the quote changed. `venue_is_active` is included in booking results for safe history navigation when a venue has been deactivated.
 
 Discovery query DTOs accept only scalar `sport`, `location`, `q` values with bounded lengths. Keyword matching includes sport and treats SQL wildcard characters literally. Date queries validate real ISO calendar dates; admin booking filters validate venue ID/status/date. Venue name/location/address are trimmed before validation. Photo URLs must be valid HTTPS URLs without credentials or a supported bundled-image path.
 
-Logout revokes the refresh-hash session and the session identified by a verified customer access JWT, so a missing refresh cookie cannot leave the access session usable. See the [QA audit](QA_AUDIT.md) for reproduction details and regression coverage.
+Logout revokes the refresh-hash session and the session identified by a verified customer access JWT, so a missing refresh cookie cannot leave the access session usable.
