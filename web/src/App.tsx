@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useRef, FormEvent } from "react";
 import {
   Link,
   NavLink,
@@ -47,6 +47,7 @@ import {
 } from "./api";
 import Admin from "./Admin";
 import { Status } from "./Status";
+import { BookingPending } from "./BookingPending";
 import { defaultBookingDate } from "./booking-date";
 const sportIcons: Record<string, string> = {
   "All sports": "✳",
@@ -708,34 +709,53 @@ function BookingForm({
   const client = useQueryClient();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const submitting = useRef(false);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!slot) return;
+    if (!slot || submitting.current) return;
+    submitting.current = true;
     setError("");
     setPending(true);
     const f = new FormData(e.currentTarget);
-    try {
-      const b = await api<Booking>("/bookings", {
-        method: "POST",
-        body: JSON.stringify({
-          slotId: slot.id,
-          name: f.get("name"),
-          phone: f.get("phone"),
-          ...(f.get("email") ? { email: f.get("email") } : {}),
-        }),
-      });
+    // Send immediately; keep the visual transition on screen for at least two seconds.
+    // allSettled also preserves the animation duration for failed requests.
+    const request = api<Booking>("/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        slotId: slot.id,
+        name: f.get("name"),
+        phone: f.get("phone"),
+        ...(f.get("email") ? { email: f.get("email") } : {}),
+      }),
+    }).then((b) => {
+      // Preserve access as soon as the reservation succeeds, even during the animation.
       saveBooking(b.reference, b.accessToken!);
+      return b;
+    });
+    try {
+      const [result] = await Promise.allSettled([
+        request,
+        new Promise<void>((resolve) => window.setTimeout(resolve, 2000)),
+      ]);
+      if (result.status === "rejected") throw result.reason;
       client.invalidateQueries({ queryKey: ["slots"] });
-      navigate("/booking/" + b.reference);
+      navigate("/booking/" + result.value.reference);
     } catch (e: any) {
       setError(e.message);
       if (e.status === 409) onConflict();
     } finally {
+      submitting.current = false;
       setPending(false);
     }
   }
   return (
-    <form className="booking-box" onSubmit={submit}>
+    <form className="booking-box" onSubmit={submit} aria-busy={pending}>
+      {pending && slot && (
+        <BookingPending
+          venue={venue.name}
+          when={`${dateLabel(date)} · ${timeLabel(slot.start_time)} – ${timeLabel(slot.end_time)} IST`}
+        />
+      )}
       <span className="eyebrow green">YOUR NEXT GOOD PLAN</span>
       <h2>Let's get you playing.</h2>
       <div className="booking-summary">

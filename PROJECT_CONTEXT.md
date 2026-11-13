@@ -89,3 +89,7 @@ After frontend changes, build and check relevant desktop/mobile screens. For boo
 - The CSS includes base rules and a later brand adaptation block; consolidate when redesigning further.
 
 Prefer completing assessment flows over adding infrastructure. Redis, Elasticsearch and AWS are potential future decisions, not current dependencies. Never publish real customer records, local `.env` values, database volumes, private access tokens or browser session data.
+
+## Booking transition
+
+`web/src/BookingPending.tsx` renders an accessible overlay with a court/ball animation while submitting a booking. The API request starts immediately and runs alongside a minimum two-second display timer. Both success and failure wait for that timer; requests taking longer remain pending. The private booking token is saved as soon as the response succeeds. A synchronous ref prevents duplicate submissions, the overlay captures focus and blocks background interaction, and CSS respects reduced-motion preferences. Confirmation is shown only after API success; conflicts return to the form with the API error.

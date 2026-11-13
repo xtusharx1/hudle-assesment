@@ -2983,3 +2983,210 @@ footer {
 .logo {
   text-transform: uppercase;
 }
+
+/* A two-second reservation transition; actual success still comes from the API. */
+.booking-pending-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #041c2acc;
+  backdrop-filter: blur(9px);
+  animation: booking-reveal 0.2s ease-out;
+}
+.booking-pending-panel {
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border: 1px solid #d8e9e5;
+  border-radius: 18px;
+  padding: 34px;
+  text-align: center;
+  box-shadow: 0 28px 90px #00151c50;
+  outline: none;
+}
+.booking-pending-panel .eyebrow {
+  justify-content: center;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  margin-top: 29px;
+}
+.booking-pending-panel h2 {
+  font-size: 25px;
+  letter-spacing: -1px;
+  margin: 14px 0 10px;
+}
+.booking-pending-panel > p {
+  font-size: 12px;
+  color: #748790;
+  margin: 0 0 21px;
+}
+.booking-pending-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border-top: 1px solid #e6eeed;
+  padding-top: 18px;
+}
+.booking-pending-summary strong {
+  font-size: 13px;
+  color: #163b42;
+}
+.booking-pending-summary > span {
+  font-size: 11px;
+  color: #738b91;
+}
+.booking-pending-panel > small {
+  font-size: 9px;
+  color: #6d8989;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 17px;
+}
+.rally-court {
+  height: 145px;
+  max-width: 280px;
+  margin: 0 auto;
+  background: #0c6a63;
+  border: 8px solid #e8f6ef;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 9px 23px #0c6a6315;
+}
+.rally-court-lines {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid #ffffff7a;
+}
+.rally-court-lines:before {
+  content: "";
+  position: absolute;
+  inset: 13px 0;
+  border-top: 1px solid #ffffff7a;
+  border-bottom: 1px solid #ffffff7a;
+}
+.rally-court-lines:after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #ffffff7a;
+}
+.rally-net {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #fff 0 4px,
+    transparent 4px 7px
+  );
+  opacity: 0.85;
+}
+.rally-ball {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #e6fa97;
+  box-shadow:
+    0 3px 0 #023e4140,
+    0 0 13px #e6fa9740;
+  animation: booking-rally 1s ease-in-out infinite alternate;
+}
+.rally-ball:after {
+  content: "";
+  position: absolute;
+  inset: 1px 4px;
+  border: 1px solid #ffffffa0;
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 50%;
+}
+.rally-mark {
+  position: absolute;
+  right: 18px;
+  bottom: 15px;
+  color: #ffffff48;
+  font-size: 13px;
+  font-weight: 800;
+}
+.booking-pending-track {
+  height: 4px;
+  background: #e8f1ef;
+  overflow: hidden;
+  border-radius: 9px;
+  margin-top: 23px;
+}
+.booking-pending-track > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #0c6a63, #02b8a5);
+  transform-origin: left;
+  animation: booking-progress 2s ease-out forwards;
+}
+@keyframes booking-rally {
+  0% {
+    transform: translate(26px, 31px) scale(0.85);
+  }
+  50% {
+    transform: translate(126px, 85px) scale(1.15);
+  }
+  100% {
+    transform: translate(222px, 35px) scale(0.85);
+  }
+}
+@keyframes booking-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(0.94);
+  }
+}
+@keyframes booking-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 560px) {
+  .booking-pending-panel {
+    padding: 28px 22px;
+  }
+  .booking-pending-panel h2 {
+    font-size: 23px;
+  }
+  .booking-pending-backdrop {
+    padding: 20px;
+  }
+  .rally-court {
+    max-width: 270px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .booking-pending-backdrop,
+  .rally-ball,
+  .booking-pending-track > span {
+    animation: none !important;
+  }
+  .rally-ball {
+    transform: translate(126px, 60px);
+  }
+  .booking-pending-track > span {
+    transform: scaleX(0.75);
+  }
+}
