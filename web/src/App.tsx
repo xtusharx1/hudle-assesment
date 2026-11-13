@@ -54,6 +54,7 @@ import { VenueImage } from "./VenueImage";
 import Admin from "./Admin";
 import { Status } from "./Status";
 import { BookingPending } from "./BookingPending";
+import { favouriteIds } from "./favourites";
 import { defaultBookingDate } from "./booking-date";
 const sportIcons: Record<string, string> = {
   "All sports": "✳",
@@ -557,9 +558,9 @@ function Discover() {
 function VenueCard({ venue: v, index }: { venue: Venue; index: number }) {
   const [liked, setLiked] = useState(() => {
     try {
-      return JSON.parse(
-        localStorage.getItem("hudle-favourites") || "[]",
-      ).includes(v.id);
+      return favouriteIds(localStorage.getItem("hudle-favourites")).includes(
+        v.id,
+      );
     } catch {
       return false;
     }
@@ -568,11 +569,10 @@ function VenueCard({ venue: v, index }: { venue: Venue; index: number }) {
     setLiked(!liked);
     let a: number[];
     try {
-      a = JSON.parse(localStorage.getItem("hudle-favourites") || "[]");
+      a = favouriteIds(localStorage.getItem("hudle-favourites"));
     } catch {
       a = [];
     }
-    if (!Array.isArray(a)) a = [];
     try {
       localStorage.setItem(
         "hudle-favourites",
@@ -655,6 +655,7 @@ function VenueDetails() {
     data: v,
     isPending,
     error,
+    refetch,
   } = useQuery({
     queryKey: ["venue", id],
     queryFn: () => api<Venue>("/venues/" + id),
@@ -704,7 +705,7 @@ function VenueDetails() {
         <ChevronLeft size={16} />
         All venues
       </Link>
-      <Status error={error} loading={isPending} />
+      <Status error={error} loading={isPending} retry={() => refetch()} />
       {v && (
         <>
           <div className="detail-heading">
@@ -995,10 +996,10 @@ function useBooking(ref: string) {
 
 function Confirmation() {
   const { reference = "" } = useParams();
-  const { data: b, error, isPending } = useBooking(reference);
+  const { data: b, error, isPending, refetch } = useBooking(reference);
   return (
     <main className="page confirmation">
-      <Status error={error} loading={isPending} />
+      <Status error={error} loading={isPending} retry={() => refetch()} />
       {b && (
         <>
           <span
