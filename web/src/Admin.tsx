@@ -14,7 +14,6 @@ import {
   ArrowUpRight,
   Plus,
   X,
-  LogOut,
   CalendarDays,
   Building2,
   Ticket,
@@ -41,10 +40,8 @@ import { VenueImage } from "./VenueImage";
 import { Dialog } from "./Dialog";
 import { Status } from "./Status";
 export default function Admin() {
-  const { admin, loading, logout } = useAuth();
-  const navigate = useNavigate(),
-    location = useLocation();
-  const [error, setError] = useState("");
+  const { admin, loading } = useAuth();
+  const location = useLocation();
   if (loading)
     return (
       <main className="page empty" role="status">
@@ -71,27 +68,7 @@ export default function Admin() {
           <h1>Partner dashboard.</h1>
           <p>Great games start with well-run spaces.</p>
         </div>
-        <button
-          className="text-btn"
-          onClick={async () => {
-            setError("");
-            try {
-              await logout();
-              navigate("/admin/login", { replace: true });
-            } catch (e: any) {
-              setError(e.message);
-            }
-          }}
-        >
-          <LogOut size={16} />
-          Sign out
-        </button>
       </div>
-      {error && (
-        <div className="notice error" role="alert">
-          {error}
-        </div>
-      )}
       <nav className="admin-nav">
         <Link to="/admin/venues">
           <Building2 size={16} />
