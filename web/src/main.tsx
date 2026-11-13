@@ -4,7 +4,11 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./Auth";
 import App from "./App";
-import "./styles.css";
+import "./styles/base.css";
+import "./styles/layout.css";
+import "./styles/customer.css";
+import "./styles/admin.css";
+import "./styles/auth.css";
 const client = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, refetchOnWindowFocus: true, staleTime: 15000 },

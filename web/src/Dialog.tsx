@@ -28,7 +28,7 @@ export function Dialog({
   return createPortal(
     <dialog
       ref={ref}
-      className={"modal qa-dialog" + (wide ? " wide" : "")}
+      className={"modal app-dialog" + (wide ? " wide" : "")}
       aria-label={title}
       onKeyDown={(e) => {
         if (e.key !== "Tab") return;
