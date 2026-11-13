@@ -47,6 +47,9 @@ export async function api<T>(
   options: RequestInit = {},
   retried = false,
 ): Promise<T> {
+  const adminTokenAtStart = path.startsWith("/admin")
+    ? sessionStorage.getItem("hudle-admin")
+    : null;
   let r: Response;
   try {
     r = await fetch((import.meta.env?.VITE_API_URL || "") + "/api" + path, {
@@ -98,7 +101,9 @@ export async function api<T>(
   if (
     r.status === 401 &&
     path.startsWith("/admin") &&
-    path !== "/admin/login"
+    path !== "/admin/login" &&
+    path !== "/admin/me" &&
+    adminTokenAtStart === sessionStorage.getItem("hudle-admin")
   ) {
     sessionStorage.removeItem("hudle-admin");
     window.dispatchEvent(new Event("hudle-admin-expired"));

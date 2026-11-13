@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from "react";
+import { useState, FormEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Link,
@@ -6,6 +6,8 @@ import {
   Route,
   Routes,
   useNavigate,
+  useLocation,
+  useSearchParams,
   useParams,
 } from "react-router-dom";
 import {
@@ -33,26 +35,36 @@ import {
   timeLabel,
   dateLabel,
 } from "./api";
-import { AuthTransition } from "./AuthTransition";
+import { useAuth } from "./Auth";
+import { loginDestination } from "./auth-rules";
 import { VenueImage } from "./VenueImage";
 import { Dialog } from "./Dialog";
 import { Status } from "./Status";
 export default function Admin() {
-  const [signed, setSigned] = useState(!!sessionStorage.getItem("hudle-admin"));
-  const navigate = useNavigate();
-  useEffect(() => {
-    const expired = () => {
-      setSigned(false);
-      navigate("/admin/login", { replace: true });
-    };
-    window.addEventListener("hudle-admin-expired", expired);
-    return () => window.removeEventListener("hudle-admin-expired", expired);
-  }, [navigate]);
-  const [leaving, setLeaving] = useState(false);
-  if (!signed) return <Login done={() => setSigned(true)} />;
+  const { admin, loading, logout } = useAuth();
+  const navigate = useNavigate(),
+    location = useLocation();
+  const [error, setError] = useState("");
+  if (loading)
+    return (
+      <main className="page empty" role="status">
+        Loading your account…
+      </main>
+    );
+  if (!admin)
+    return location.pathname === "/admin/login" ? (
+      <Login />
+    ) : (
+      <Navigate
+        to={
+          "/admin/login?next=" +
+          encodeURIComponent(location.pathname + location.search)
+        }
+        replace
+      />
+    );
   return (
     <main className="page admin-page content-transition">
-      {leaving && <AuthTransition action="logout" />}
       <div className="admin-top">
         <div>
           <span className="eyebrow green">THE OTHER SIDE OF THE GAME</span>
@@ -61,20 +73,25 @@ export default function Admin() {
         </div>
         <button
           className="text-btn"
-          disabled={leaving}
           onClick={async () => {
-            setLeaving(true);
-            await new Promise((resolve) => window.setTimeout(resolve, 850));
-            sessionStorage.removeItem("hudle-admin");
-            setSigned(false);
-            setLeaving(false);
-            navigate("/admin");
+            setError("");
+            try {
+              await logout();
+              navigate("/admin/login", { replace: true });
+            } catch (e: any) {
+              setError(e.message);
+            }
           }}
         >
           <LogOut size={16} />
           Sign out
         </button>
       </div>
+      {error && (
+        <div className="notice error" role="alert">
+          {error}
+        </div>
+      )}
       <nav className="admin-nav">
         <Link to="/admin/venues">
           <Building2 size={16} />
@@ -96,7 +113,10 @@ export default function Admin() {
     </main>
   );
 }
-function Login({ done }: { done: () => void }) {
+function Login() {
+  const { authenticateAdmin, user } = useAuth();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -106,19 +126,13 @@ function Login({ done }: { done: () => void }) {
     setError("");
     const f = new FormData(e.currentTarget);
     try {
-      const [result] = await Promise.allSettled([
-        api<{ token: string }>("/admin/login", {
-          method: "POST",
-          body: JSON.stringify({
-            username: f.get("username"),
-            password: f.get("password"),
-          }),
-        }),
-        new Promise((resolve) => window.setTimeout(resolve, 850)),
-      ]);
-      if (result.status === "rejected") throw result.reason;
-      sessionStorage.setItem("hudle-admin", result.value.token);
-      done();
+      await authenticateAdmin({
+        username: String(f.get("username")),
+        password: String(f.get("password")),
+      });
+      navigate(loginDestination("admin", params.get("next")), {
+        replace: true,
+      });
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -127,13 +141,12 @@ function Login({ done }: { done: () => void }) {
   }
   return (
     <main className="page login-page content-transition">
-      {pending && <AuthTransition action="login" />}
       <form onSubmit={submit} className="booking-box">
         <span className="success-circle small">
           <LockKeyhole size={24} />
         </span>
         <span className="eyebrow green">FOR THE PEOPLE BEHIND THE PLAY</span>
-        <h1>Welcome back.</h1>
+        <h1>{user ? "Switch to venue admin." : "Welcome back."}</h1>
         <p>Sign in to manage your venues and games.</p>
         <label>
           Username
@@ -154,7 +167,7 @@ function Login({ done }: { done: () => void }) {
           </div>
         )}
         <button disabled={pending} className="btn full">
-          {pending ? "Signing in…" : "Sign in"}
+          {pending ? "Signing in…" : user ? "Continue as admin" : "Sign in"}
           <ArrowUpRight size={18} />
         </button>
         <Link className="back-link" to="/">

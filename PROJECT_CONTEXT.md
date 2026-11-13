@@ -39,13 +39,13 @@ The sample catalogue has 18 fictional venues across 8 sports and 15 neighbourhoo
 
 Customers register with name, normalized unique email, Indian mobile number and a scrypt-hashed password. Access JWTs last 15 minutes; rotating refresh sessions last up to 30 days. Customer tokens use HttpOnly SameSite cookies. Logout revokes the current session. Other tabs synchronize account changes without storing customer tokens in JavaScript.
 
-The single admin account comes from environment variables. Its eight-hour JWT is stored in session storage; admin and customer access are separate.
+The single admin account comes from environment variables. Its eight-hour JWT is stored in session storage and validated through `/api/admin/me`. A shared frontend auth provider resolves loading, guest, customer or admin state. Entering admin mode revokes the current customer session; logout clears the active role and private query caches.
 
 Historical guest bookings remain admin-visible and are not automatically assigned by matching phone/email. Favourites are browser-local.
 
 ## Frontend behavior
 
-- The profile icon shows Profile, My bookings and Log out for signed-in users. `/profile` displays account details and booking totals.
+- The profile icon shows Sign in / Sign up for guests, Profile / My bookings / Log out for customers, and Admin dashboard / All bookings / Log out for admins. Header navigation and route redirects follow the same role. `/profile` displays account details and booking totals.
 - Discovery filters/sort are stored in URL parameters so Back restores them.
 - Slot selection uses current availability and prices. A 409 refreshes the grid.
 - Booking displays a minimum two-second court animation. Login/register/logout use shorter account transitions. Reduced-motion settings are supported.
@@ -68,4 +68,4 @@ Historical guest bookings remain admin-visible and are not automatically assigne
 
 ## Verification
 
-Run `npm run build` and `DB_NAME=hudle_test npm test`. The suite has 29 real-MySQL API tests and 12 frontend tests covering booking conflicts, cancellation, authentication, validation, dates and formatting. Tests may reset only a separate database ending in `_test`; never reset the normal app database for verification.
+Run `npm run build` and `DB_NAME=hudle_test npm test`. The suite has 30 real-MySQL API tests and 27 frontend tests covering booking conflicts, cancellation, authentication, validation, dates, formatting and role-based navigation. Tests may reset only a separate database ending in `_test`; never reset the normal app database for verification.

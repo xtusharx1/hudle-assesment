@@ -118,7 +118,7 @@ Customer access JWTs last 15 minutes and use issuer/audience/role checks. Random
 
 “My bookings” is loaded from MySQL for the account and works on another browser after sign-in. The migration preserves historical guest rows without attaching them to accounts by unverified email/phone; those rows remain admin-visible. Existing local-storage guest tokens no longer grant public access. Email/mobile verification and password recovery are outside the assessment scope.
 
-Admin JWTs expire after eight hours and are kept in session storage. Credentials come from the environment, with constant-time comparisons. Helmet, input allowlisting/validation, and a bounded process-local rate limiter are included. The limiter is suitable for this single-instance demo, not a distributed deployment. Production startup requires explicit `JWT_SECRET` and `ADMIN_PASSWORD`.
+Admin JWTs expire after eight hours and are kept in session storage. The shared frontend session state controls menus and navigation for guests, customers and admins. Entering admin mode ends the current customer session; admin users are redirected away from customer-only pages. Credentials come from the environment, with constant-time comparisons. Helmet, input allowlisting/validation, and a bounded process-local rate limiter are included. The limiter is suitable for this single-instance demo, not a distributed deployment. Production startup requires explicit `JWT_SECRET` and `ADMIN_PASSWORD`.
 
 ## Time and money
 
@@ -153,6 +153,7 @@ Customer endpoints (JWT cookie required):
 Admin:
 
 - `POST /api/admin/login` — `{ username, password }`
+- `GET /api/admin/me` — validate the admin session and return its identity
 - `GET / POST /api/admin/venues`
 - `PUT / DELETE /api/admin/venues/:id` — delete means deactivate
 - `GET / POST /api/admin/venues/:id/slots`

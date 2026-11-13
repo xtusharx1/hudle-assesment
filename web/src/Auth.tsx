@@ -16,98 +16,149 @@ import {
 } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AuthTransition, AuthAction } from "./AuthTransition";
-import { ApiError, api } from "./api";
+import {
+  AuthRole,
+  resolveRole,
+  loginDestination,
+  customerRouteRedirect,
+} from "./auth-rules";
+import { ApiError, api, adminApi } from "./api";
 export interface User {
   id: number;
   name: string;
   email: string;
   phone: string;
 }
-const Context = createContext<{
+interface AdminIdentity {
+  role: "admin";
+  username: string;
+}
+interface AuthContext {
   user: User | null;
+  admin: AdminIdentity | null;
+  role: AuthRole;
   loading: boolean;
-  setUser: (u: User | null) => void;
   logout: () => Promise<void>;
   authenticate: (
     action: "login" | "register",
     body: Record<string, unknown>,
   ) => Promise<User>;
-}>({
+  authenticateAdmin: (body: {
+    username: string;
+    password: string;
+  }) => Promise<void>;
+}
+const Context = createContext<AuthContext>({
   user: null,
+  admin: null,
+  role: "loading",
   loading: true,
-  setUser: () => {},
   logout: async () => {},
   authenticate: async () => {
+    throw new Error("Missing auth provider");
+  },
+  authenticateAdmin: async () => {
     throw new Error("Missing auth provider");
   },
 });
 export const useAuth = () => useContext(Context);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null),
+    [admin, setAdmin] = useState<AdminIdentity | null>(null),
     [loading, setLoading] = useState(true);
   const [transition, setTransition] = useState<AuthAction | null>(null);
-  const busy = useRef(false);
-  const authVersion = useRef(0);
+  const busy = useRef(false),
+    version = useRef(0);
   const client = useQueryClient();
-  const clearCustomerData = () => {
-    client.cancelQueries({
-      predicate: (q) =>
-        ["booking", "my-bookings"].includes(String(q.queryKey[0])),
-    });
-    client.removeQueries({
-      predicate: (q) =>
-        ["booking", "my-bookings"].includes(String(q.queryKey[0])),
-    });
+  const clearPrivateData = () => {
+    const predicate = (q: { queryKey: readonly unknown[] }) =>
+      ["booking", "my-bookings"].includes(String(q.queryKey[0])) ||
+      String(q.queryKey[0]).startsWith("admin-");
+    void client.cancelQueries({ predicate });
+    client.removeQueries({ predicate });
   };
-  const announce = () => {
+  const clearAdmin = () => {
+    sessionStorage.removeItem("hudle-admin");
+    setAdmin(null);
+  };
+  const announce = (role: AuthRole) => {
     try {
       localStorage.setItem(
         "hudle-account-change",
-        String(Date.now()) + Math.random(),
+        JSON.stringify({ role, nonce: Date.now() + Math.random() }),
       );
-    } catch {
-      /* Cookies still work if storage is unavailable. */
-    }
+    } catch {}
   };
   useEffect(() => {
     let active = true;
-    // Ignore account checks started before a newer login/logout action.
     const sync = async () => {
       if (busy.current) return;
-      const version = authVersion.current;
+      const current = version.current;
+      const apply = (fn: () => void) => {
+        if (active && current === version.current) fn();
+      };
       try {
-        const current = await api<User>("/auth/me");
-        if (active && version === authVersion.current) setUser(current);
-      } catch (e) {
-        if (
-          active &&
-          version === authVersion.current &&
-          e instanceof ApiError &&
-          e.status === 401
-        ) {
-          setUser(null);
-          clearCustomerData();
+        if (sessionStorage.getItem("hudle-admin")) {
+          try {
+            const identity = await adminApi<AdminIdentity>("/me");
+            apply(() => {
+              setAdmin(identity);
+              setUser(null);
+            });
+            return;
+          } catch (e) {
+            if (!(e instanceof ApiError) || e.status !== 401) throw e;
+            if (current !== version.current) return;
+            clearAdmin();
+            clearPrivateData();
+          }
         }
+        const customer = await api<User>("/auth/me");
+        apply(() => {
+          setAdmin(null);
+          setUser(customer);
+        });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401)
+          apply(() => {
+            setUser(null);
+            setAdmin(null);
+            clearPrivateData();
+          });
       } finally {
-        if (active && version === authVersion.current) setLoading(false);
+        apply(() => setLoading(false));
       }
     };
     const changed = (e: StorageEvent) => {
-      if (e.key === "hudle-account-change") {
-        authVersion.current++;
-        clearCustomerData();
-        void sync();
+      if (e.key !== "hudle-account-change") return;
+      version.current++;
+      setLoading(true);
+      try {
+        if (JSON.parse(e.newValue || "{}").role !== "admin") clearAdmin();
+      } catch {
+        clearAdmin();
       }
+      clearPrivateData();
+      void sync();
+    };
+    const adminExpired = () => {
+      version.current++;
+      setLoading(true);
+      clearAdmin();
+      clearPrivateData();
+      void sync();
     };
     void sync();
     window.addEventListener("storage", changed);
     window.addEventListener("focus", sync);
     window.addEventListener("hudle-session-expired", sync);
+    window.addEventListener("hudle-admin-expired", adminExpired);
     return () => {
       active = false;
       window.removeEventListener("storage", changed);
       window.removeEventListener("focus", sync);
       window.removeEventListener("hudle-session-expired", sync);
+      window.removeEventListener("hudle-admin-expired", adminExpired);
     };
   }, [client]);
   async function run<T>(
@@ -115,9 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     request: () => Promise<T>,
   ): Promise<T> {
     if (busy.current)
-      throw new Error("Please wait for the current sign-in action.");
+      throw new Error("Please wait for the current account action.");
     busy.current = true;
-    authVersion.current++;
+    version.current++;
     setTransition(action);
     try {
       const [result] = await Promise.allSettled([
@@ -136,34 +187,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     action: "login" | "register",
     body: Record<string, unknown>,
   ) {
-    const u = await run(action, () =>
+    const customer = await run(action, () =>
       api<User>("/auth/" + action, {
         method: "POST",
         body: JSON.stringify(body),
       }),
     );
-    clearCustomerData();
-    setUser(u);
-    announce();
-    return u;
+    clearAdmin();
+    clearPrivateData();
+    setUser(customer);
+    announce("customer");
+    return customer;
+  }
+  async function authenticateAdmin(body: {
+    username: string;
+    password: string;
+  }) {
+    const result = await run("login", async () => {
+      const login = await api<{ token: string; username: string }>(
+        "/admin/login",
+        { method: "POST", body: JSON.stringify(body) },
+      );
+      // End the player session before entering the admin role; logout must not reveal a hidden second account.
+      await api("/auth/logout", { method: "POST" });
+      return login;
+    });
+    sessionStorage.setItem("hudle-admin", result.token);
+    clearPrivateData();
+    setUser(null);
+    setAdmin({ role: "admin", username: result.username });
+    announce("admin");
   }
   async function logout() {
     await run("logout", () => api("/auth/logout", { method: "POST" }));
+    clearAdmin();
+    clearPrivateData();
     setUser(null);
-    clearCustomerData();
-    announce();
+    announce("guest");
   }
+  const role = resolveRole(loading, !!admin, !!user);
   return (
     <Context.Provider
       value={{
         user,
+        admin,
+        role,
         loading,
-        setUser: (u) => {
-          clearCustomerData();
-          setUser(u);
-        },
         logout,
         authenticate,
+        authenticateAdmin,
       }}
     >
       {children}
@@ -172,32 +244,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 export function RequireUser({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth(),
+  const { role } = useAuth(),
     loc = useLocation();
-  if (loading)
+  if (role === "loading")
     return (
       <main className="page empty" role="status">
         Loading your account…
       </main>
     );
-  return user ? (
-    <>{children}</>
-  ) : (
-    <Navigate
-      replace
-      to={"/login?next=" + encodeURIComponent(loc.pathname + loc.search)}
-    />
-  );
+  const redirect = customerRouteRedirect(role, loc.pathname + loc.search);
+  return redirect ? <Navigate to={redirect} replace /> : <>{children}</>;
 }
 export function AuthPage({ register = false }: { register?: boolean }) {
-  const { user, authenticate, loading } = useAuth(),
+  const { role, authenticate, loading } = useAuth(),
     navigate = useNavigate(),
     [params] = useSearchParams();
-  const next = params.get("next") || "/my-bookings";
-  const target =
-    next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")
-      ? next
-      : "/my-bookings";
+  const target = loginDestination(
+    role === "admin" ? "admin" : "customer",
+    params.get("next"),
+  );
   const [error, setError] = useState(""),
     [pending, setPending] = useState(false);
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -229,7 +294,8 @@ export function AuthPage({ register = false }: { register?: boolean }) {
         Loading your account…
       </main>
     );
-  if (user) return <Navigate to={target} replace />;
+  if (role === "customer" || role === "admin")
+    return <Navigate to={target} replace />;
   return (
     <main className="auth-page">
       <section className="auth-story">

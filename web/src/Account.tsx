@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   UserRound,
+  LayoutDashboard,
   ChevronDown,
   ArrowUpRight,
   Ticket,
@@ -12,11 +13,22 @@ import {
   Mail,
   Phone,
 } from "lucide-react";
+import { accountActions } from "./auth-rules";
 import { useAuth } from "./Auth";
 import { useNow } from "./useNow";
 import { api, Booking } from "./api";
 export function ProfileMenu() {
-  const { user, loading, logout } = useAuth();
+  const { user, admin, role, loading, logout } = useAuth();
+  const displayName = admin ? "Admin" : user?.name;
+  const actions = accountActions(role);
+  const icons: Record<string, typeof UserRound> = {
+    admin: LayoutDashboard,
+    profile: UserRound,
+    bookings: Ticket,
+    logout: LogOut,
+    login: LogIn,
+    register: UserPlus,
+  };
   const [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const root = useRef<HTMLDivElement>(null),
@@ -26,7 +38,7 @@ export function ProfileMenu() {
   useEffect(() => {
     setOpen(false);
     setError("");
-  }, [location.pathname, location.search, user?.id]);
+  }, [location.pathname, location.search, user?.id, role]);
   useEffect(() => {
     if (!open) return;
     root.current?.querySelector<HTMLElement>(".profile-card")?.focus();
@@ -46,8 +58,8 @@ export function ProfileMenu() {
       document.removeEventListener("keydown", escape);
     };
   }, [open]);
-  const initials = user?.name
-    .split(/\s+/)
+  const initials = displayName
+    ?.split(/\s+/)
     .slice(0, 2)
     .map((n) => n[0])
     .join("")
@@ -74,7 +86,13 @@ export function ProfileMenu() {
       <button
         ref={trigger}
         className={"profile-trigger" + (open ? " is-open" : "")}
-        aria-label={user ? "Open your account" : "Open account options"}
+        aria-label={
+          role === "admin"
+            ? "Open admin account"
+            : user
+              ? "Open your account"
+              : "Open account options"
+        }
         aria-expanded={open}
         aria-controls="profile-panel"
         onClick={() => setOpen(!open)}
@@ -84,7 +102,7 @@ export function ProfileMenu() {
           {initials || <UserRound size={19} />}
         </span>
         <span className="profile-trigger-label">
-          {user ? user.name.split(" ")[0] : "Account"}
+          {displayName ? displayName.split(" ")[0] : "Account"}
         </span>
         <ChevronDown size={14} />
       </button>
@@ -99,41 +117,34 @@ export function ProfileMenu() {
               {initials || <UserRound size={24} />}
             </span>
             <div>
-              <h2>{user ? user.name : "Account"}</h2>
+              <h2>{displayName || "Account"}</h2>
+              {admin && <p>{admin.username}</p>}
               {user && <p>{user.email}</p>}
             </div>
           </div>
           <div className="profile-list">
-            {user ? (
-              <>
-                <Link className="profile-card" to="/profile">
-                  <UserRound size={18} />
-                  <span>Profile</span>
+            {actions.map((action) => {
+              const Icon = icons[action.icon];
+              return action.to ? (
+                <Link
+                  key={action.label}
+                  className="profile-card"
+                  to={action.to}
+                >
+                  <Icon size={18} />
+                  <span>{action.label}</span>
                 </Link>
-                <Link className="profile-card" to="/my-bookings">
-                  <Ticket size={18} />
-                  <span>My bookings</span>
-                </Link>
+              ) : (
                 <button
+                  key={action.label}
                   className="profile-card profile-card-logout"
                   onClick={signOut}
                 >
-                  <LogOut size={18} />
-                  <span>Log out</span>
+                  <Icon size={18} />
+                  <span>{action.label}</span>
                 </button>
-              </>
-            ) : (
-              <>
-                <Link className="profile-card" to="/login">
-                  <LogIn size={18} />
-                  <span>Sign in</span>
-                </Link>
-                <Link className="profile-card" to="/register">
-                  <UserPlus size={18} />
-                  <span>Sign up</span>
-                </Link>
-              </>
-            )}
+              );
+            })}
           </div>
           {error && (
             <p className="notice error" role="alert">

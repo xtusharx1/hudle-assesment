@@ -591,3 +591,15 @@ it("deletes an unbooked slot without leaving an availability record", async () =
   const rows = await db.query("SELECT id FROM slots WHERE id=?", [slot]);
   expect(rows).toEqual([]);
 });
+it("identifies an admin session independently from customer login", async () => {
+  const identity = await request(app.getHttpServer())
+    .get("/api/admin/me")
+    .set("Authorization", "Bearer " + admin)
+    .expect(200);
+  expect(identity.body).toEqual({
+    role: "admin",
+    username: process.env.ADMIN_USERNAME || "admin",
+  });
+  await request(app.getHttpServer()).get("/api/admin/me").expect(401);
+  await player.get("/api/admin/me").expect(401);
+});

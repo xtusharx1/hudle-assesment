@@ -78,6 +78,7 @@ All paths begin `/api`.
 | GET          | `/bookings/:reference`              | Customer JWT cookie | One authorized booking                                      |
 | POST         | `/bookings/:reference/cancel`       | Customer JWT cookie | Cancelled booking                                           |
 | POST         | `/admin/login`                      | Credentials         | `{username,password}` -> eight-hour JWT                     |
+| GET          | `/admin/me`                         | Admin JWT           | Current admin role and username                             |
 | GET / POST   | `/admin/venues`                     | Admin JWT           | List all / create                                           |
 | PUT / DELETE | `/admin/venues/:id`                 | Admin JWT           | Edit / deactivate                                           |
 | GET / POST   | `/admin/venues/:id/slots`           | Admin JWT           | Date query / `{date,start_time,end_time,price}`             |

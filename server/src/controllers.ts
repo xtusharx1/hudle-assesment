@@ -86,7 +86,10 @@ export class LoginController {
       !equal(b.password, process.env.ADMIN_PASSWORD || "PlayWithHudle!2026")
     )
       throw new UnauthorizedException("Incorrect username or password");
-    return { token: this.jwt.sign({ role: "admin" }) };
+    return {
+      token: this.jwt.sign({ role: "admin" }),
+      username: process.env.ADMIN_USERNAME || "admin",
+    };
   }
 }
 @Controller("api/admin")
@@ -96,6 +99,9 @@ export class AdminController {
     private catalog: CatalogService,
     private bookings: BookingsService,
   ) {}
+  @Get("me") me() {
+    return { role: "admin", username: process.env.ADMIN_USERNAME || "admin" };
+  }
   @Get("venues") venues() {
     return this.catalog.venues({}, true);
   }

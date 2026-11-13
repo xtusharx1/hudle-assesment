@@ -84,6 +84,8 @@ function RouteScroll() {
 }
 export default function App() {
   const location = useLocation();
+  const { role } = useAuth();
+  const isAdmin = role === "admin";
   const isAccountPage = ["/login", "/register"].includes(location.pathname);
   const [menu, setMenu] = useState(false);
   useEffect(() => setMenu(false), [location.pathname]);
@@ -118,28 +120,43 @@ export default function App() {
           HUDLE<span>↗</span>
         </Link>
         <nav id="main-navigation" className={menu ? "nav open" : "nav"}>
-          <NavLink to="/" end onClick={() => setMenu(false)}>
-            Discover venues
-          </NavLink>
-          <NavLink to="/my-bookings" onClick={() => setMenu(false)}>
-            My bookings
-          </NavLink>
-          <Link
-            className="mobile-partner-link"
-            to="/admin"
-            onClick={() => setMenu(false)}
-          >
-            Venue partners
-          </Link>
+          {role === "loading" ? null : isAdmin ? (
+            <>
+              <NavLink to="/admin/venues" onClick={() => setMenu(false)}>
+                Venues & slots
+              </NavLink>
+              <NavLink to="/admin/bookings" onClick={() => setMenu(false)}>
+                All bookings
+              </NavLink>
+            </>
+          ) : (
+            <>
+              <NavLink to="/" end onClick={() => setMenu(false)}>
+                Discover venues
+              </NavLink>
+              <NavLink to="/my-bookings" onClick={() => setMenu(false)}>
+                My bookings
+              </NavLink>
+              <Link
+                className="mobile-partner-link"
+                to="/admin"
+                onClick={() => setMenu(false)}
+              >
+                Venue partners
+              </Link>
+            </>
+          )}
         </nav>
         <div className="header-right">
           <ProfileMenu />
           <span className="city">
             <MapPin size={15} /> Delhi NCR
           </span>
-          <Link className="admin-link" to="/admin">
-            For venue partners <ArrowUpRight size={15} />
-          </Link>
+          {role !== "loading" && !isAdmin && (
+            <Link className="admin-link" to="/admin">
+              For venue partners <ArrowUpRight size={15} />
+            </Link>
+          )}
           <button
             className="mobile-menu icon-btn"
             aria-expanded={menu}
@@ -824,7 +841,7 @@ function BookingForm({
   onConflict: () => void;
 }) {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
   const client = useQueryClient();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -900,7 +917,11 @@ function BookingForm({
           {error}
         </div>
       )}
-      {user ? (
+      {role === "admin" ? (
+        <Link className="btn full" to="/admin/venues">
+          Manage venues <ArrowUpRight size={19} />
+        </Link>
+      ) : user ? (
         <button className="btn full" disabled={!slot || pending}>
           {pending ? "Reserving your court…" : "Confirm booking"}
           <ArrowUpRight size={19} />
@@ -918,6 +939,12 @@ function BookingForm({
           {loading ? "Loading account…" : "Sign in to book"}
           <ArrowUpRight size={19} />
         </Link>
+      )}
+      {role === "admin" && (
+        <p className="browser-note">
+          You are signed in as a venue admin. Log out to book with a player
+          account.
+        </p>
       )}
       <p className="secure-note">
         <ShieldCheck size={13} />
