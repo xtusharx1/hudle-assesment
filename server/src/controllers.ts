@@ -1,0 +1,134 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Headers,
+  ParseIntPipe,
+  UseGuards,
+  UnauthorizedException,
+  HttpCode,
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { CatalogService } from "./catalog";
+import { BookingsService } from "./bookings";
+import { AdminGuard, equal } from "./common";
+import {
+  BookingDto,
+  LoginDto,
+  VenueDto,
+  SlotDto,
+  SlotPatchDto,
+  GenerateDto,
+} from "./dtos";
+import { today } from "./time";
+@Controller("api")
+export class PublicController {
+  constructor(
+    private catalog: CatalogService,
+    private bookings: BookingsService,
+  ) {}
+  @Get("health") health() {
+    return { status: "ok", timezone: "Asia/Kolkata" };
+  }
+  @Get("venues") venues(@Query() q: any) {
+    return this.catalog.venues(q);
+  }
+  @Get("venue-filters") filters() {
+    return this.catalog.filters();
+  }
+  @Get("venues/:id") venue(@Param("id", ParseIntPipe) id: number) {
+    return this.catalog.venue(id);
+  }
+  @Get("venues/:id/slots") slots(
+    @Param("id", ParseIntPipe) id: number,
+    @Query("date") date: string,
+  ) {
+    return this.catalog.slots(id, date || today());
+  }
+  @Post("bookings") book(@Body() b: BookingDto) {
+    return this.bookings.create(b);
+  }
+  @Get("bookings/:reference") get(
+    @Param("reference") ref: string,
+    @Headers("x-booking-token") token: string,
+  ) {
+    return this.bookings.get(ref, token);
+  }
+  @Post("bookings/:reference/cancel") @HttpCode(200) cancel(
+    @Param("reference") ref: string,
+    @Headers("x-booking-token") token: string,
+  ) {
+    return this.bookings.cancel(ref, token);
+  }
+}
+@Controller("api/admin")
+export class LoginController {
+  constructor(private jwt: JwtService) {}
+  @Post("login") @HttpCode(200) login(@Body() b: LoginDto) {
+    if (
+      !equal(b.username, process.env.ADMIN_USERNAME || "admin") ||
+      !equal(b.password, process.env.ADMIN_PASSWORD || "PlayWithHudle!2026")
+    )
+      throw new UnauthorizedException("Incorrect username or password");
+    return { token: this.jwt.sign({ role: "admin" }) };
+  }
+}
+@Controller("api/admin")
+@UseGuards(AdminGuard)
+export class AdminController {
+  constructor(
+    private catalog: CatalogService,
+    private bookings: BookingsService,
+  ) {}
+  @Get("venues") venues() {
+    return this.catalog.venues({}, true);
+  }
+  @Post("venues") create(@Body() b: VenueDto) {
+    return this.catalog.saveVenue(b);
+  }
+  @Put("venues/:id") edit(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() b: VenueDto,
+  ) {
+    return this.catalog.saveVenue(b, id);
+  }
+  @Delete("venues/:id") remove(@Param("id", ParseIntPipe) id: number) {
+    return this.catalog.deactivate(id);
+  }
+  @Get("venues/:id/slots") slots(
+    @Param("id", ParseIntPipe) id: number,
+    @Query("date") date: string,
+  ) {
+    return this.catalog.slots(id, date || today(), true);
+  }
+  @Post("venues/:id/slots") add(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() b: SlotDto,
+  ) {
+    return this.catalog.addSlot(id, b);
+  }
+  @Post("venues/:id/slots/generate") generate(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() b: GenerateDto,
+  ) {
+    return this.catalog.generate(id, b);
+  }
+  @Patch("slots/:id") patch(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() b: SlotPatchDto,
+  ) {
+    return this.catalog.editSlot(id, b);
+  }
+  @Delete("slots/:id") delete(@Param("id", ParseIntPipe) id: number) {
+    return this.catalog.editSlot(id, {}, true);
+  }
+  @Get("bookings") bookingsList(@Query() q: any) {
+    return this.bookings.list(q);
+  }
+}

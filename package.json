@@ -1,0 +1,19 @@
+{
+  "name": "hudle",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c green,cyan \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w server && npm run build -w web",
+    "test": "npm run test -w server && npm run test -w web",
+    "db:seed": "npm run seed -w server",
+    "format": "prettier --write \"server/src/**/*.ts\" \"server/test/**/*.ts\" \"web/src/**/*.{ts,tsx,css}\" \"*.{json,yml,md}\" \"web/*.{json,ts,html}\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.10.1"
+  }
+}
