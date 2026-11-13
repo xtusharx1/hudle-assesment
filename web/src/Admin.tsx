@@ -179,11 +179,28 @@ function Login() {
   );
 }
 function Venues() {
+  const [params, setParams] = useSearchParams();
+  const pageSize = 5;
   const client = useQueryClient();
   const query = useQuery({
     queryKey: ["admin-venues"],
     queryFn: () => adminApi<Venue[]>("/venues"),
   });
+  const total = query.data?.length ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const requestedPage = Number(params.get("page") || 1);
+  const page = Math.min(
+    pageCount,
+    Number.isSafeInteger(requestedPage) ? Math.max(1, requestedPage) : 1,
+  );
+  const start = (page - 1) * pageSize;
+  const venues = query.data?.slice(start, start + pageSize);
+  function changePage(next: number) {
+    const updated = new URLSearchParams(params);
+    if (next === 1) updated.delete("page");
+    else updated.set("page", String(next));
+    setParams(updated);
+  }
   const [editing, setEditing] = useState<Venue | null | undefined>(undefined);
   const [deactivate, setDeactivate] = useState<Venue | null>(null);
   const mutation = useMutation({
@@ -224,7 +241,7 @@ function Venues() {
             </tr>
           </thead>
           <tbody>
-            {query.data?.map((v) => (
+            {venues?.map((v) => (
               <tr key={v.id}>
                 <td>
                   <div className="table-venue">
@@ -281,6 +298,44 @@ function Venues() {
           </tbody>
         </table>
       </div>
+      {query.data && (
+        <nav className="venue-pagination" aria-label="Venue pagination">
+          <span role="status">
+            {total
+              ? `${start + 1}–${Math.min(start + pageSize, total)} of ${total} venues`
+              : "No venues yet"}
+          </span>
+          <div className="pagination-controls">
+            <button
+              className="text-btn"
+              disabled={page === 1}
+              onClick={() => changePage(page - 1)}
+            >
+              Previous
+            </button>
+            {Array.from({ length: pageCount }, (_, i) => i + 1).map(
+              (number) => (
+                <button
+                  key={number}
+                  className="pagination-page"
+                  aria-label={`Page ${number}`}
+                  aria-current={page === number ? "page" : undefined}
+                  onClick={() => changePage(number)}
+                >
+                  {number}
+                </button>
+              ),
+            )}
+            <button
+              className="text-btn"
+              disabled={page === pageCount}
+              onClick={() => changePage(page + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </nav>
+      )}
       {editing !== undefined && (
         <VenueForm venue={editing} close={() => setEditing(undefined)} />
       )}

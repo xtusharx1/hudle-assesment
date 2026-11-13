@@ -4189,3 +4189,41 @@ footer {
     right: 16px;
   }
 }
+
+.venue-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px 0;
+  color: #60736b;
+  font-size: 13px;
+}
+.pagination-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pagination-page {
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid #dce6e1;
+  border-radius: 8px;
+  background: white;
+  color: #23594d;
+  cursor: pointer;
+}
+.pagination-page[aria-current="page"] {
+  background: #155d50;
+  color: white;
+  border-color: #155d50;
+}
+.pagination-page:hover:not([aria-current="page"]) {
+  background: #eef6f2;
+}
+.pagination-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

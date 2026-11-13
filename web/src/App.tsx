@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from "react";
 import {
   Link,
   NavLink,
+  Navigate,
   Routes,
   Route,
   useParams,
@@ -116,7 +117,11 @@ export default function App() {
         Skip to content
       </a>
       <header className="header">
-        <Link to="/" className="logo" aria-label="Hudle home">
+        <Link
+          to={isAdmin ? "/admin/venues" : "/"}
+          className="logo"
+          aria-label="Hudle home"
+        >
           HUDLE<span>↗</span>
         </Link>
         <nav id="main-navigation" className={menu ? "nav open" : "nav"}>
@@ -137,22 +142,26 @@ export default function App() {
               <NavLink to="/my-bookings" onClick={() => setMenu(false)}>
                 My bookings
               </NavLink>
-              <Link
-                className="mobile-partner-link"
-                to="/admin"
-                onClick={() => setMenu(false)}
-              >
-                Venue partners
-              </Link>
+              {role === "guest" && (
+                <Link
+                  className="mobile-partner-link"
+                  to="/admin"
+                  onClick={() => setMenu(false)}
+                >
+                  Venue partners
+                </Link>
+              )}
             </>
           )}
         </nav>
         <div className="header-right">
           <ProfileMenu />
-          <span className="city">
-            <MapPin size={15} /> Delhi NCR
-          </span>
-          {role !== "loading" && !isAdmin && (
+          {!isAdmin && (
+            <span className="city">
+              <MapPin size={15} /> Delhi NCR
+            </span>
+          )}
+          {role === "guest" && (
             <Link className="admin-link" to="/admin">
               For venue partners <ArrowUpRight size={15} />
             </Link>
@@ -175,8 +184,22 @@ export default function App() {
         key={location.pathname}
       >
         <Routes>
-          <Route path="/" element={<Discover />} />
-          <Route path="/venues/:id" element={<VenueDetails />} />
+          <Route
+            path="/"
+            element={
+              isAdmin ? <Navigate to="/admin/venues" replace /> : <Discover />
+            }
+          />
+          <Route
+            path="/venues/:id"
+            element={
+              isAdmin ? (
+                <Navigate to="/admin/venues" replace />
+              ) : (
+                <VenueDetails />
+              )
+            }
+          />
           <Route
             path="/booking/:reference"
             element={
@@ -217,7 +240,7 @@ export default function App() {
           />
         </Routes>
       </div>
-      {!isAccountPage && (
+      {!isAccountPage && !isAdmin && (
         <footer>
           <Link to="/" className="logo">
             HUDLE<span>↗</span>
