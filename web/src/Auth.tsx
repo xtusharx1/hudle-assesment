@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [transition, setTransition] = useState<AuthAction | null>(null);
   const busy = useRef(false),
     version = useRef(0);
+  const restoredAdminToken = useRef<string | null>(null);
   const client = useQueryClient();
   const clearPrivateData = () => {
     const predicate = (q: { queryKey: readonly unknown[] }) =>
@@ -98,9 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (active && current === version.current) fn();
       };
       try {
-        if (sessionStorage.getItem("hudle-admin")) {
+        const adminToken = sessionStorage.getItem("hudle-admin");
+        if (adminToken) {
           try {
             const identity = await adminApi<AdminIdentity>("/me");
+            if (!active || current !== version.current) return;
+            // Older tabs could leave both credentials present. End the hidden player
+            // session before restoring admin access, once per admin token.
+            if (restoredAdminToken.current !== adminToken) {
+              await api("/auth/logout", { method: "POST" });
+              restoredAdminToken.current = adminToken;
+            }
             apply(() => {
               setAdmin(identity);
               setUser(null);
@@ -213,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return login;
     });
     sessionStorage.setItem("hudle-admin", result.token);
+    restoredAdminToken.current = result.token;
     clearPrivateData();
     setUser(null);
     setAdmin({ role: "admin", username: result.username });
