@@ -1,3 +1,4 @@
+import { venueAmenities } from "../lib/venue";
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -76,11 +77,7 @@ export function VenueDetails() {
           new Date(`${s.date}T${s.start_time}+05:30`).getTime() > clock,
       )) ||
     null;
-  const amenities = v
-    ? (typeof v.amenities === "string"
-        ? JSON.parse(v.amenities)
-        : v.amenities) || ["Parking", "Drinking water"]
-    : [];
+  const amenities = venueAmenities(v?.amenities);
   return (
     <main className="page details">
       <Link to="/" className="back-link">
@@ -93,7 +90,7 @@ export function VenueDetails() {
           <div className="detail-heading">
             <div>
               <span className="eyebrow green">
-                {v.sport.toUpperCase()} · DELHI NCR
+                {v.sport.toUpperCase()} · {v.location}
               </span>
               <h1>{v.name}</h1>
               <p>
@@ -101,11 +98,13 @@ export function VenueDetails() {
                 {v.address}
               </p>
             </div>
-            <span className="rating large">
-              <Star size={17} fill="currentColor" />
-              {v.rating}
-              <small>Venue rating</small>
-            </span>
+            {v.rating != null && (
+              <span className="rating large">
+                <Star size={17} fill="currentColor" />
+                {v.rating}
+                <small>Venue rating</small>
+              </span>
+            )}
           </div>
           <div className="detail-photo">
             <VenueImage src={v.image_url} alt={v.name} />

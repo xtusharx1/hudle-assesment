@@ -33,24 +33,14 @@ export function BookingForm({
     submitting.current = true;
     setError("");
     setPending(true);
-    // Send immediately; keep the visual transition on screen for at least two seconds.
-    // allSettled also preserves the animation duration for failed requests.
-    const request = api<Booking>("/bookings", {
-      method: "POST",
-      body: JSON.stringify({
-        slotId: slot.id,
-        expectedPrice: slot.price,
-      }),
-    });
     try {
-      const [result] = await Promise.allSettled([
-        request,
-        new Promise<void>((resolve) => window.setTimeout(resolve, 2000)),
-      ]);
-      if (result.status === "rejected") throw result.reason;
+      const booking = await api<Booking>("/bookings", {
+        method: "POST",
+        body: JSON.stringify({ slotId: slot.id, expectedPrice: slot.price }),
+      });
       client.invalidateQueries({ queryKey: ["slots"] });
       client.invalidateQueries({ queryKey: ["my-bookings"] });
-      navigate("/booking/" + result.value.reference);
+      navigate("/booking/" + booking.reference);
     } catch (e: any) {
       setError(e.message);
       if (e.status === 409) onConflict();

@@ -730,3 +730,80 @@ it("a customer cannot promote their role through a booking payload", async () =>
     .expect(400);
   await player.get("/api/admin/venues").expect(403);
 });
+
+it("reactivates a venue without overwriting its details and permits bookings again", async () => {
+  const auth = "Bearer " + admin;
+  await request(app.getHttpServer())
+    .delete(`/api/admin/venues/${venue}`)
+    .set("Authorization", auth)
+    .expect(200);
+  await request(app.getHttpServer()).get(`/api/venues/${venue}`).expect(404);
+  const updated = await request(app.getHttpServer())
+    .put(`/api/admin/venues/${venue}`)
+    .set("Authorization", auth)
+    .send({ is_active: true })
+    .expect(200);
+  expect(updated.body.is_active).toBe(1);
+  expect(updated.body.name).toBe("Test Court");
+  expect(updated.body.price_per_hour).toBe(50000);
+  await request(app.getHttpServer()).get(`/api/venues/${venue}`).expect(200);
+  await book().expect(201);
+  for (const body of [
+    { is_active: null },
+    { is_active: "true" },
+    { name: " " },
+    { price_per_hour: null },
+  ]) {
+    await request(app.getHttpServer())
+      .put(`/api/admin/venues/${venue}`)
+      .set("Authorization", auth)
+      .send(body)
+      .expect(400);
+  }
+});
+
+it("creates unrated venues without inventing ratings or amenities", async () => {
+  const created = await request(app.getHttpServer())
+    .post("/api/admin/venues")
+    .set("Authorization", "Bearer " + admin)
+    .send({
+      name: "Unrated Court",
+      sport: "Tennis",
+      location: "Pune",
+      address: "Example Street, Pune",
+      price_per_hour: 25000,
+    })
+    .expect(201);
+  expect(created.body.rating).toBeNull();
+  expect(created.body.amenities).toBeNull();
+  const detail = await request(app.getHttpServer())
+    .get(`/api/venues/${created.body.id}`)
+    .expect(200);
+  expect(detail.body.location).toBe("Pune");
+  expect(detail.body.rating).toBeNull();
+  expect(detail.body.amenities).toBeNull();
+});
+
+it("limits the nearest forwarded client independently instead of sharing the proxy's quota", async () => {
+  const credentials = {
+    username: "invalid-admin",
+    password: "invalid-password",
+  };
+  for (let i = 0; i < 11; i++) {
+    await request(app.getHttpServer())
+      .post("/api/admin/login")
+      .set("X-Forwarded-For", "198.51.100.22, 203.0.113.41")
+      .send(credentials)
+      .expect(i < 10 ? 401 : 429);
+  }
+  await request(app.getHttpServer())
+    .post("/api/admin/login")
+    .set("X-Forwarded-For", "198.51.100.99, 203.0.113.41")
+    .send(credentials)
+    .expect(429);
+  await request(app.getHttpServer())
+    .post("/api/admin/login")
+    .set("X-Forwarded-For", "203.0.113.42")
+    .send(credentials)
+    .expect(401);
+});

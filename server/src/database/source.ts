@@ -5,6 +5,7 @@ config({ path: resolve(__dirname, "../../../.env"), quiet: true });
 import { DataSource } from "typeorm";
 import { InitialSchema1760000000000 } from "./schema";
 import { SeedBatches1760000000001 } from "./seed-batches";
+import { NullableVenueRating1760000000003 } from "./venue-rating";
 import { UserAccounts1760000000002 } from "./user-accounts";
 export const db = new DataSource({
   type: "mysql",
@@ -19,6 +20,7 @@ export const db = new DataSource({
     InitialSchema1760000000000,
     SeedBatches1760000000001,
     UserAccounts1760000000002,
+    NullableVenueRating1760000000003,
   ],
   migrationsRun: true,
   synchronize: false,

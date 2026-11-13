@@ -10,6 +10,7 @@ import {
   IsBoolean,
   IsIn,
   ValidateBy,
+  ValidateIf,
   IsDateString,
 } from "class-validator";
 import { Transform } from "class-transformer";
@@ -98,6 +99,17 @@ export class VenueDto {
   image_url?: string;
   @IsInt() @Min(0) @Max(10000000) price_per_hour!: number;
 }
+export class VenueUpdateDto extends VenueDto {
+  @ValidateIf((_, value) => value !== undefined) declare name: string;
+  @ValidateIf((_, value) => value !== undefined) declare sport: string;
+  @ValidateIf((_, value) => value !== undefined) declare location: string;
+  @ValidateIf((_, value) => value !== undefined) declare address: string;
+  @ValidateIf((_, value) => value !== undefined) declare price_per_hour: number;
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  is_active?: boolean;
+}
+
 export class SlotDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) start_time!: string;

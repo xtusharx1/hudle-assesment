@@ -22,6 +22,7 @@ import {
   BookingDto,
   LoginDto,
   VenueDto,
+  VenueUpdateDto,
   SlotDto,
   SlotPatchDto,
   GenerateDto,
@@ -137,7 +138,7 @@ export class AdminController {
   }
   @Put("venues/:id") edit(
     @Param("id", ParseIntPipe) id: number,
-    @Body() b: VenueDto,
+    @Body() b: VenueUpdateDto,
   ) {
     return this.catalog.saveVenue(b, id);
   }

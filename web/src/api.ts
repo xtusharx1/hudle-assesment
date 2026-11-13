@@ -7,7 +7,7 @@ export interface Venue {
   description: string;
   image_url: string;
   price_per_hour: number;
-  rating: string;
+  rating: string | null;
   amenities: string[] | string | null;
   is_active: number;
 }

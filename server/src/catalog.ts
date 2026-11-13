@@ -6,7 +6,13 @@ import {
 } from "@nestjs/common";
 import { db } from "./database/source";
 import { dateValid, startsAt, today } from "./time";
-import { VenueDto, SlotDto, SlotPatchDto, GenerateDto } from "./dtos";
+import {
+  VenueDto,
+  VenueUpdateDto,
+  SlotDto,
+  SlotPatchDto,
+  GenerateDto,
+} from "./dtos";
 @Injectable()
 export class CatalogService {
   async filters() {
@@ -67,30 +73,42 @@ export class CatalogService {
             : "AVAILABLE",
     }));
   }
-  async saveVenue(body: VenueDto, id?: number) {
-    if (id) await this.venue(id, true);
-    const values = [
-      body.name.trim(),
-      body.sport,
-      body.location.trim(),
-      body.address.trim(),
-      body.description || "",
-      body.image_url || "",
-      body.price_per_hour,
-    ];
-    if (id)
-      await db.query(
-        "UPDATE venues SET name=?,sport=?,location=?,address=?,description=?,image_url=?,price_per_hour=? WHERE id=?",
-        [...values, id],
-      );
-    else {
-      const result = await db.query(
-        "INSERT INTO venues(name,sport,location,address,description,image_url,price_per_hour) VALUES(?,?,?,?,?,?,?)",
-        values,
-      );
-      id = result.insertId;
+  async saveVenue(input: VenueDto | VenueUpdateDto, id?: number) {
+    if (id) {
+      await this.venue(id, true);
+      const body: Partial<VenueDto> & { is_active?: boolean } = input;
+      const columns = [
+        "name",
+        "sport",
+        "location",
+        "address",
+        "description",
+        "image_url",
+        "price_per_hour",
+        "is_active",
+      ] as const;
+      const fields = columns.filter((column) => body[column] !== undefined);
+      if (fields.length) {
+        await db.query(
+          `UPDATE venues SET ${fields.map((column) => `${column}=?`).join(",")} WHERE id=?`,
+          [...fields.map((column) => body[column] ?? ""), id],
+        );
+      }
+      return this.venue(id, true);
     }
-    return this.venue(id!, true);
+    const result = await db.query(
+      "INSERT INTO venues(name,sport,location,address,description,image_url,price_per_hour) VALUES(?,?,?,?,?,?,?)",
+      [
+        input.name.trim(),
+        input.sport,
+        input.location.trim(),
+        input.address.trim(),
+        input.description || "",
+        input.image_url || "",
+        input.price_per_hour,
+      ],
+    );
+    return this.venue(result.insertId, true);
   }
   async deactivate(id: number) {
     return db.transaction(async (m) => {

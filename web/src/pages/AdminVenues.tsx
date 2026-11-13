@@ -33,12 +33,20 @@ export function AdminVenues() {
   const [editing, setEditing] = useState<Venue | null | undefined>(undefined);
   const [deactivate, setDeactivate] = useState<Venue | null>(null);
   const mutation = useMutation({
-    mutationFn: (v: Venue) => adminApi("/venues/" + v.id, { method: "DELETE" }),
+    mutationFn: (v: Venue) =>
+      adminApi(
+        "/venues/" + v.id,
+        v.is_active
+          ? { method: "DELETE" }
+          : { method: "PUT", body: JSON.stringify({ is_active: true }) },
+      ),
     onSuccess: () => {
       setDeactivate(null);
       client.invalidateQueries({ queryKey: ["admin-venues"] });
       client.invalidateQueries({ queryKey: ["venues"] });
       client.invalidateQueries({ queryKey: ["venue-filters"] });
+      client.invalidateQueries({ queryKey: ["venue"] });
+      client.invalidateQueries({ queryKey: ["slots"] });
     },
   });
   return (
@@ -58,6 +66,11 @@ export function AdminVenues() {
         error={query.error}
         retry={() => query.refetch()}
       />
+      {mutation.error && !deactivate && (
+        <div className="notice error" role="alert">
+          {mutation.error.message}
+        </div>
+      )}
       <div className="table-wrap">
         <table>
           <thead>
@@ -108,6 +121,18 @@ export function AdminVenues() {
                     >
                       <Pencil size={15} />
                     </button>
+                    {!v.is_active && (
+                      <button
+                        className="text-btn"
+                        disabled={mutation.isPending}
+                        onClick={() => {
+                          mutation.reset();
+                          mutation.mutate(v);
+                        }}
+                      >
+                        Activate
+                      </button>
+                    )}
                     {!!v.is_active && (
                       <button
                         className="icon-btn danger"

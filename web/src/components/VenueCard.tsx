@@ -71,10 +71,12 @@ export function VenueCard({
           <Link to={"/venues/" + v.id}>
             <h3>{v.name}</h3>
           </Link>
-          <span className="rating">
-            <Star size={12} fill="currentColor" />
-            {v.rating}
-          </span>
+          {v.rating != null && (
+            <span className="rating">
+              <Star size={12} fill="currentColor" />
+              {v.rating}
+            </span>
+          )}
         </div>
         <p>
           <MapPin size={13} />

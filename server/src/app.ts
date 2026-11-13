@@ -41,6 +41,8 @@ if (
 })
 export class AppModule {}
 export function configure(app: INestApplication) {
+  // Trust only the nearest reverse proxy, which supplies the client address.
+  app.getHttpAdapter().getInstance().set("trust proxy", 1);
   app.use(helmet());
   const origins = (
     process.env.WEB_ORIGIN ||

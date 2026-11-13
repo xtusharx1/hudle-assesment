@@ -391,7 +391,7 @@ export function AuthPage({ register = false }: { register?: boolean }) {
                   required
                   minLength={2}
                   maxLength={100}
-                  placeholder="Tushar Sharma"
+                  placeholder="Your full name"
                 />
               </label>
               <label>

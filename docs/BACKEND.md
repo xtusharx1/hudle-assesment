@@ -61,7 +61,7 @@ All customer booking routes require the customer role through `RbacGuard`; the s
 
 Single additions and bulk generation serialize on the venue row. Reject overlap when `existing.start < new.end AND existing.end > new.start`. Bulk generation accepts at most 31 days and 30–240 minute slots, skipping existing overlaps and past starts. Generated prices follow the venue's hourly rate and duration.
 
-Repricing retains historical booking amounts. Blocking a confirmed slot and deleting any slot with booking history return conflicts. Venue deletion means deactivation, preserving historical customer access. Existing slot time windows are immutable through the API.
+Repricing retains historical booking amounts. Blocking a confirmed slot and deleting any slot with booking history return conflicts. Venue deletion means deactivation, preserving historical customer access. Admins can reactivate a venue with `PUT /admin/venues/:id` and `{ "is_active": true }`. Updates change only supplied fields. Existing slot time windows are immutable through the API.
 
 ## HTTP endpoints
 
@@ -86,7 +86,7 @@ All paths begin `/api`.
 | POST         | `/admin/login`                      | Credentials         | `{username,password}` -> eight-hour JWT                     |
 | GET          | `/admin/me`                         | Admin JWT           | Current admin role and username                             |
 | GET / POST   | `/admin/venues`                     | Admin JWT           | List all / create                                           |
-| PUT / DELETE | `/admin/venues/:id`                 | Admin JWT           | Edit / deactivate                                           |
+| PUT / DELETE | `/admin/venues/:id`                 | Admin JWT           | Partial update (including `is_active`) / deactivate         |
 | GET / POST   | `/admin/venues/:id/slots`           | Admin JWT           | Date query / `{date,start_time,end_time,price}`             |
 | POST         | `/admin/venues/:id/slots/generate`  | Admin JWT           | `{from,to,opens,closes,duration}` -> created/skipped counts |
 | PATCH        | `/admin/slots/:id`                  | Admin JWT           | `{is_blocked?,price?}`                                      |
@@ -119,7 +119,7 @@ Prices are integer paise; ₹650 is `65000`. Slot date/time values are IST with 
 
 ## Migrations and tests
 
-Migrations live in `src/database/schema.ts` `seed-batches.ts` and `user-accounts.ts` and are registered in `source.ts`. Add a new timestamped migration for later schema changes rather than rewriting an applied migration. MySQL DDL may commit independently; plan data-preserving migrations and backups.
+Migrations live in `src/database/schema.ts` `seed-batches.ts`, `user-accounts.ts` and `venue-rating.ts` and are registered in `source.ts`. Add a new timestamped migration for later schema changes rather than rewriting an applied migration. MySQL DDL may commit independently; plan data-preserving migrations and backups.
 
 The integration suite boots NestJS against a separate real MySQL schema, exercises parallel requests, checks database occupancy, account isolation, JWT/session protection, cancellation/rebooking, slot management, validation, dynamic filters and seed batch idempotence. Run commands in [SETUP.md](SETUP.md).
 
@@ -132,3 +132,11 @@ The assessment uses one bookable resource per venue. Payments, notifications and
 Discovery query DTOs accept only scalar `sport`, `location`, `q` values with bounded lengths. Keyword matching includes sport and treats SQL wildcard characters literally. Date queries validate real ISO calendar dates; admin booking filters validate venue ID/status/date. Venue name/location/address are trimmed before validation. Photo URLs must be valid HTTPS URLs without credentials or a supported bundled-image path.
 
 Logout revokes the refresh-hash session and the session identified by a verified customer access JWT, so a missing refresh cookie cannot leave the access session usable.
+
+## Admin sessions and request limits
+
+Admin credentials come from environment variables and use constant-time comparisons. Admin JWTs expire after eight hours and are kept in browser session storage. The frontend maintains a single active customer/admin role and clears private query data on account changes. Helmet adds security headers; production startup requires explicit signing secrets and admin credentials.
+
+The process-local limiter allows 10 login/registration requests and 300 other requests per client IP per minute. Nginx appends the connecting client to `X-Forwarded-For`; Express trusts the nearest proxy hop. Deploy behind one trusted reverse proxy and restrict direct API exposure to preserve that address boundary. Customer password hashing, cookie rotation and origin checks are described above.
+
+Venue ratings are nullable. The rating migration changes the default for new venues without overwriting existing ratings. Seeded ratings and photography are illustrative demo data. No amenities are implied when the stored list is empty.
